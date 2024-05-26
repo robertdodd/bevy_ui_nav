@@ -67,9 +67,9 @@ fn startup(mut commands: Commands) {
         ))
         .with_children(|p| {
             spawn_menu(true, false, p, MainMenu, |p| {
-                spawn_button(p, "Option 1", true, false, ButtonAction::Option1);
-                spawn_button(p, "Disabled", false, true, ButtonAction::Option2);
-                spawn_button(p, "Option 2", false, false, ButtonAction::Option2);
+                spawn_button(p, "Option 1", true, false, false, ButtonAction::Option1);
+                spawn_button(p, "Disabled", false, true, false, ButtonAction::Option2);
+                spawn_button(p, "Option 2", false, false, false, ButtonAction::Option2);
                 p.spawn(NodeBundle {
                     style: Style {
                         flex_direction: FlexDirection::Row,
@@ -80,8 +80,8 @@ fn startup(mut commands: Commands) {
                     ..default()
                 })
                 .with_children(|p| {
-                    spawn_button(p, "Cancel", false, false, ButtonAction::Quit);
-                    spawn_button(p, "Save", false, false, ButtonAction::Save);
+                    spawn_button(p, "Cancel", false, false, false, ButtonAction::Quit);
+                    spawn_button(p, "Save", false, false, false, ButtonAction::Save);
                 });
             });
         });
