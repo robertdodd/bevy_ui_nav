@@ -7,6 +7,9 @@ consolidates click event handling from key presses and mouse button clicks (usin
 
 ## TODO
 
+- Update text input example
+- Focus change events should say whether moved by mouse or button.
+- Remove/fix debug logging and println statements
 - add directional press events, e.g. a focusable that increments/decrements when you press left/right, instead of
   navigating
 - allow pressing DOWN (hold) then LEFT. This should be treated as 2 key presses, even though directions are pressed the
