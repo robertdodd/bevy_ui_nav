@@ -66,7 +66,9 @@ fn handle_click_events(
         if let Ok(button_action) = query.get(event.0) {
             println!("ClickEvent: {:?}", button_action);
             match *button_action {
-                ButtonAction::Quit => app_exit_writer.send(AppExit),
+                ButtonAction::Quit => {
+                    app_exit_writer.send(AppExit);
+                }
                 ButtonAction::Save => (),
                 _ => (),
             };

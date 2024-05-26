@@ -6,8 +6,14 @@
 /// - `UiNavInteractionType::User` means that the navigation event was the direfct result of user navigation input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UiNavInteractionType {
-    Internal,
-    User,
+    /// The interaction was sent automatically from this plugin, most likely focusing on a newly added focusable.
+    Auto,
+    /// The interaction was sent manually via an event
+    Manual,
+    /// The interaction was from the mouse
+    Mouse,
+    /// The interaction was from a button press (Gamepad or keyboard)
+    Button,
 }
 
 /// Type used to describe the state of a button, i.e. whether it is pressed or released.

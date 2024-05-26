@@ -180,7 +180,7 @@ fn setup_new_focusables(
     if let Some(new_focus) = new_focus {
         nav_request_writer.send(NavRequest::SetFocus {
             entity: new_focus,
-            interaction_type: UiNavInteractionType::Internal,
+            interaction_type: UiNavInteractionType::Auto,
         });
     }
 }
@@ -271,7 +271,7 @@ fn handle_interactions(
         {
             nav_request_writer.send(NavRequest::SetFocus {
                 entity,
-                interaction_type: UiNavInteractionType::User,
+                interaction_type: UiNavInteractionType::Mouse,
             });
         }
     }
@@ -334,9 +334,9 @@ fn handle_internal_set_focus_events(
 
                 // send an event notifying about this focus change
                 if new_is_focused {
-                    nav_event_writer.send(match interaction_type {
-                        UiNavInteractionType::Internal => UiNavFocusChangedEvent::Internal(entity),
-                        UiNavInteractionType::User => UiNavFocusChangedEvent::User(entity),
+                    nav_event_writer.send(UiNavFocusChangedEvent {
+                        entity,
+                        interaction_type,
                     });
                 }
             }
@@ -501,10 +501,10 @@ fn handle_internal_focus_move_events(
                 );
 
             if let Some(nearest) = nearest {
-                set_focus_writer.send(InternalSetFocusEvent::new_user(nearest.entity));
+                set_focus_writer.send(InternalSetFocusEvent::new_button(nearest.entity));
             } else if let (Some(furthest), true) = (furthest, current_menu.is_wrap) {
                 println!("No nearest, wrapping around");
-                set_focus_writer.send(InternalSetFocusEvent::new_user(furthest.entity));
+                set_focus_writer.send(InternalSetFocusEvent::new_button(furthest.entity));
             }
         }
     } else {
@@ -566,9 +566,9 @@ fn handle_lock_events(mut events: EventReader<UiNavLockEvent>, mut nav_state: Re
 /// System that listens for keyboard or gamepad input and emits the appropriate navigation events.
 #[allow(clippy::too_many_arguments)]
 fn handle_input(
-    keys: Res<Input<KeyCode>>,
+    keys: Res<ButtonInput<KeyCode>>,
     gamepads: Res<Gamepads>,
-    gamepad_buttons: Res<Input<GamepadButton>>,
+    gamepad_buttons: Res<ButtonInput<GamepadButton>>,
     gamepad_axis: Res<Axis<GamepadAxis>>,
     mut nav_request_writer: EventWriter<NavRequest>,
     mut nav_state: ResMut<UiNavState>,
@@ -658,7 +658,9 @@ fn handle_nav_requests(
                 }
                 NavRequest::ActionPress => action_press = Some(PressType::Press),
                 NavRequest::ActionRelease => action_press = Some(PressType::Release),
-                NavRequest::Cancel => cancel_writer.send(UiNavCancelEvent(current_menu)),
+                NavRequest::Cancel => {
+                    cancel_writer.send(UiNavCancelEvent(current_menu));
+                }
             }
         }
 
@@ -720,7 +722,7 @@ fn handle_internal_refresh_events(
         if let Some((entity, _)) = new_focusable {
             nav_request_writer.send(NavRequest::SetFocus {
                 entity,
-                interaction_type: UiNavInteractionType::Internal,
+                interaction_type: UiNavInteractionType::Auto,
             });
         }
     }

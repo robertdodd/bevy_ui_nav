@@ -1,4 +1,4 @@
-use bevy::{app::AppExit, prelude::*};
+use bevy::{app::AppExit, input::keyboard::KeyboardInput, prelude::*};
 use bevy_ui_nav::prelude::*;
 
 use example_utils::*;
@@ -17,12 +17,13 @@ fn main() {
                 handle_button_click_events.run_if(on_event::<UiNavClickEvent>()),
                 handle_text_control_click_events.run_if(on_event::<UiNavClickEvent>()),
                 (
+                    handle_keyboard_input_events.run_if(on_event::<KeyboardInput>()),
                     listen_received_character_events,
                     handle_text_control_active_input,
                 )
                     .chain(),
                 update_text_on_change,
-                update_title_label.run_if(resource_changed::<GameData>()),
+                update_title_label.run_if(resource_changed::<GameData>),
             )
                 .after(UiNavSet),
         )
@@ -184,7 +185,9 @@ fn handle_button_click_events(
         if let Ok(button_action) = query.get(event.0) {
             println!("ClickEvent: {:?}", button_action);
             match *button_action {
-                ButtonAction::Quit => app_exit_writer.send(AppExit),
+                ButtonAction::Quit => {
+                    app_exit_writer.send(AppExit);
+                }
                 ButtonAction::Reset => {
                     game_data.name = "".to_string();
                     for mut text_control in text_control_query.iter_mut() {
@@ -198,18 +201,17 @@ fn handle_button_click_events(
 
 /// System that handles key presses while a text control has focus
 fn handle_text_control_active_input(
-    keys: Res<Input<KeyCode>>,
-    mut query: Query<(&mut TextControlStatus, &mut TextControl, &Children)>,
-    mut text_query: Query<&mut Text>,
+    keys: Res<ButtonInput<KeyCode>>,
+    mut query: Query<(&mut TextControlStatus, &mut TextControl)>,
     mut lock_writer: EventWriter<UiNavLockEvent>,
     mut game_data: ResMut<GameData>,
 ) {
-    for (mut status, mut text_control, children) in query.iter_mut() {
+    for (mut status, mut text_control) in query.iter_mut() {
         if *status == TextControlStatus::InActive {
             continue;
         }
 
-        if keys.just_pressed(KeyCode::Return) {
+        if keys.just_pressed(KeyCode::Enter) {
             *status = TextControlStatus::InActive;
             lock_writer.send(UiNavLockEvent::Unlock);
             game_data.name = text_control.0.clone();
@@ -217,11 +219,29 @@ fn handle_text_control_active_input(
             *status = TextControlStatus::InActive;
             lock_writer.send(UiNavLockEvent::Unlock);
             text_control.0 = game_data.name.clone();
-        } else if keys.just_pressed(KeyCode::Back) {
-            text_control.0.pop();
-            for &child in children.iter() {
-                if let Ok(mut text) = text_query.get_mut(child) {
-                    text.sections[0].value = text_control.0.clone();
+        }
+    }
+}
+
+/// System that handles key presses while a text control has focus
+fn handle_keyboard_input_events(
+    mut events: EventReader<KeyboardInput>,
+    mut query: Query<(&TextControlStatus, &mut TextControl, &Children)>,
+    mut text_query: Query<&mut Text>,
+) {
+    for event in events.read() {
+        for (status, mut text_control, children) in query.iter_mut() {
+            if *status == TextControlStatus::InActive {
+                continue;
+            }
+
+            if let KeyCode::Backspace = event.key_code {
+                text_control.0.pop();
+                text_control.set_changed();
+                for &child in children.iter() {
+                    if let Ok(mut text) = text_query.get_mut(child) {
+                        text.sections[0].value = text_control.0.clone();
+                    }
                 }
             }
         }
@@ -263,13 +283,13 @@ fn listen_received_character_events(
     mut query: Query<(&mut TextControl, &TextControlStatus, &Children)>,
     mut text_query: Query<&mut Text>,
 ) {
-    for event in events.read().filter(|event| !event.char.is_control()) {
+    for event in events.read().filter(|event| event.char != "\r") {
         for (mut text_control, status, children) in query.iter_mut() {
             if *status != TextControlStatus::Active {
                 continue;
             }
 
-            text_control.0.push(event.char);
+            text_control.0.push_str(&event.char);
 
             // Update the text content instantly
             for &child in children.iter() {
