@@ -168,6 +168,7 @@ fn setup_new_focusables(
                     && !focusable.is_disabled
                     && Some(menu_parent) == nav_state.menu
                     && new_focus.is_none()
+                    && !focusable.is_mouse_only
                 {
                     new_focus = Some(entity);
                 }
@@ -235,7 +236,7 @@ fn handle_interactions(
             .map_or(false, |nav_menu| nav_menu.is_locked);
 
         let is_in_current_menu = focusable.menu == nav_state.menu;
-        if !(is_in_current_menu || !is_current_menu_locked && !is_menu_locked) {
+        if !(is_in_current_menu || !(is_current_menu_locked && is_menu_locked)) {
             continue;
         }
 
@@ -246,7 +247,12 @@ fn handle_interactions(
             Interaction::Hovered => (false, true),
             Interaction::None => (false, false),
         };
-        if is_pressed != focusable.is_pressed_interaction {
+        if focusable.is_mouse_only && !is_hovered && !is_pressed {
+            focusable.is_focused = false;
+            focusable.is_pressed_interaction = false;
+            focusable.is_pressed_interaction_from_active = false;
+            focusable.is_hovered_interaction = false;
+        } else if is_pressed != focusable.is_pressed_interaction {
             // send click events
             if focusable.is_pressed_interaction
                 && focusable.is_pressed_interaction_from_active
@@ -310,10 +316,14 @@ fn handle_internal_set_focus_events(
                         acc
                     }
                 })
-                .map(|(entity, _)| (entity, event.interaction_type));
+                .map(|(entity, _)| (entity, event.interaction_type, false));
         } else if let Ok((_, focusable)) = focusable_query.get(event.entity) {
             if !focusable.is_disabled {
-                new_focused = Some((event.entity, event.interaction_type));
+                new_focused = Some((
+                    event.entity,
+                    event.interaction_type,
+                    focusable.is_mouse_only,
+                ));
             }
         } else {
             error!("FocusEvent query failed");
@@ -321,23 +331,35 @@ fn handle_internal_set_focus_events(
     }
 
     // remove focus from other entities
-    if let Some((new_focused, interaction_type)) = new_focused {
-        for (entity, mut focusable) in focusable_query.iter_mut() {
-            let new_is_focused = if entity == new_focused && focusable.menu.is_some() {
-                nav_state.menu = focusable.menu;
-                true
-            } else {
-                false
-            };
-            if new_is_focused != focusable.is_focused {
-                focusable.is_focused = new_is_focused;
+    if let Some((new_focused, interaction_type, is_mouse_only)) = new_focused {
+        if is_mouse_only {
+            if let Ok((_, mut focusable)) = focusable_query.get_mut(new_focused) {
+                focusable.is_focused = true;
+            }
+        } else {
+            for (entity, mut focusable) in focusable_query.iter_mut() {
+                // Ignore "mouse_only" focusables
+                if focusable.is_mouse_only {
+                    continue;
+                }
 
-                // send an event notifying about this focus change
-                if new_is_focused {
-                    nav_event_writer.send(UiNavFocusChangedEvent {
-                        entity,
-                        interaction_type,
-                    });
+                // define whether this focusable should be focused and update the focus state if it changed
+                let new_is_focused = if entity == new_focused && focusable.menu.is_some() {
+                    nav_state.menu = focusable.menu;
+                    true
+                } else {
+                    false
+                };
+                if new_is_focused != focusable.is_focused {
+                    focusable.is_focused = new_is_focused;
+
+                    // send an event notifying about this focus change
+                    if new_is_focused && !focusable.is_mouse_only {
+                        nav_event_writer.send(UiNavFocusChangedEvent {
+                            entity,
+                            interaction_type,
+                        });
+                    }
                 }
             }
         }
@@ -393,6 +415,7 @@ fn handle_internal_focus_move_events(
             focusable.active()
                 && focusable.menu == Some(current_menu_entity)
                 && !focusable.is_disabled
+                && !focusable.is_mouse_only
         })
         .map(|(_, focusable, node, global_transform)| {
             let focus_node = FocusNode {
@@ -414,7 +437,7 @@ fn handle_internal_focus_move_events(
                 .filter(|(_, focusable, _, _)| {
                     !focusable.active()
                         && !focusable.is_disabled
-                        && focusable.menu.is_some()
+                        && !focusable.is_mouse_only
                         && focusable.menu == Some(current_menu_entity)
                 })
                 // convert to focus node
@@ -529,7 +552,7 @@ fn handle_internal_action_button_events(
     for event in events.read() {
         for (entity, mut focusable) in query.iter_mut() {
             // ignore non-active focusables
-            if !focusable.active() || focusable.is_disabled {
+            if !focusable.active() || focusable.is_disabled || focusable.is_mouse_only {
                 continue;
             }
 
@@ -707,11 +730,13 @@ fn handle_internal_refresh_events(
     });
 
     // If we don't have a focusable, find one in the current menu. Prefer one that has `is_priority` set to true,
-    // otherwise, sue the first one we find.
+    // otherwise, use the first one we find.
     if current_focusable.is_none() {
         let new_focusable = focusable_query
             .iter()
-            .filter(|(_, focusable)| focusable.menu.is_some() && focusable.menu == current_menu)
+            .filter(|(_, focusable)| {
+                focusable.menu == current_menu && !focusable.is_disabled && !focusable.is_mouse_only
+            })
             .reduce(|acc, e| {
                 if e.1.is_priority && !acc.1.is_priority {
                     e

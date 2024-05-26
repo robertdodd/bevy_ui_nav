@@ -49,6 +49,9 @@ pub struct Focusable {
     pub(crate) is_disabled: bool,
     /// Whether the button is focused
     pub(crate) is_focused: bool,
+    /// Whether the button can only be pressed via the mouse. If `true`, focusing on this button will not remove focus
+    /// from other buttons.
+    pub is_mouse_only: bool,
 }
 
 impl Focusable {
@@ -69,6 +72,12 @@ impl Focusable {
     /// Sets the `disabled` value and returns the `Focusable`.
     pub fn with_disabled(mut self, disabled: bool) -> Self {
         self.is_disabled = disabled;
+        self
+    }
+
+    /// Sets the `is_mouse_only` value and returns the `Focusable`.
+    pub fn with_mouse_only(mut self, mouse_only: bool) -> Self {
+        self.is_mouse_only = mouse_only;
         self
     }
 
