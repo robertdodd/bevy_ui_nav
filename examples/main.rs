@@ -87,10 +87,10 @@ fn startup(mut commands: Commands) {
         });
 }
 
-fn handle_scroll(keys: Res<Input<KeyCode>>, mut query: Query<&mut Style, With<MenuScroll>>) {
-    let direction = if keys.just_pressed(KeyCode::W) {
+fn handle_scroll(keys: Res<ButtonInput<KeyCode>>, mut query: Query<&mut Style, With<MenuScroll>>) {
+    let direction = if keys.just_pressed(KeyCode::KeyW) {
         Some(-1.)
-    } else if keys.just_pressed(KeyCode::S) {
+    } else if keys.just_pressed(KeyCode::KeyS) {
         Some(1.)
     } else {
         None
@@ -118,7 +118,9 @@ fn handle_click_events(
     for button_action in events.nav_iter().in_query(&query) {
         println!("ClickEvent: {:?}", button_action);
         match *button_action {
-            ButtonAction::Quit => app_exit_writer.send(AppExit),
+            ButtonAction::Quit => {
+                app_exit_writer.send(AppExit);
+            }
             ButtonAction::Save => (),
             _ => (),
         };
