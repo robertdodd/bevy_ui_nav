@@ -4,19 +4,19 @@ use crate::input::*;
 
 pub(crate) const DEFAULT_INPUT_MAP: &[InputMapping] = &[
     InputMapping::Key {
-        keycode: KeyCode::Up,
+        keycode: KeyCode::ArrowUp,
         action: ActionType::Up,
     },
     InputMapping::Key {
-        keycode: KeyCode::Down,
+        keycode: KeyCode::ArrowDown,
         action: ActionType::Down,
     },
     InputMapping::Key {
-        keycode: KeyCode::Left,
+        keycode: KeyCode::ArrowLeft,
         action: ActionType::Left,
     },
     InputMapping::Key {
-        keycode: KeyCode::Right,
+        keycode: KeyCode::ArrowRight,
         action: ActionType::Right,
     },
     InputMapping::Key {
@@ -24,7 +24,7 @@ pub(crate) const DEFAULT_INPUT_MAP: &[InputMapping] = &[
         action: ActionType::Action,
     },
     InputMapping::Key {
-        keycode: KeyCode::Return,
+        keycode: KeyCode::Enter,
         action: ActionType::Action,
     },
     InputMapping::Key {

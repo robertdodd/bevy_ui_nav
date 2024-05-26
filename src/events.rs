@@ -6,9 +6,9 @@ use crate::types::*;
 ///
 /// A user can use these events to react to UI Navigation events, for example to play a sound when focus changes.
 #[derive(Event, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UiNavFocusChangedEvent {
-    User(Entity),     // Focus set in direct response to user input.
-    Internal(Entity), // Focus set internally by this plugin.
+pub struct UiNavFocusChangedEvent {
+    pub entity: Entity,
+    pub interaction_type: UiNavInteractionType,
 }
 
 /// Event emitted when the "Cancel" key is pressed. The entity is the menu.
@@ -32,15 +32,6 @@ pub enum UiNavLockEvent {
 /// This event is sent by this plugin and should be handled by the user.
 #[derive(Event)]
 pub struct UiNavClickEvent(pub Entity);
-
-impl InternalSetFocusEvent {
-    pub fn new_user(entity: Entity) -> Self {
-        Self {
-            entity,
-            interaction_type: UiNavInteractionType::User,
-        }
-    }
-}
 
 /// Event used internally to trigger a UI navigation request.
 ///
@@ -88,4 +79,13 @@ pub(crate) struct InternalRefreshEvent;
 pub(crate) struct InternalSetFocusEvent {
     pub entity: Entity,
     pub interaction_type: UiNavInteractionType,
+}
+
+impl InternalSetFocusEvent {
+    pub fn new_button(entity: Entity) -> Self {
+        Self {
+            entity,
+            interaction_type: UiNavInteractionType::Button,
+        }
+    }
 }

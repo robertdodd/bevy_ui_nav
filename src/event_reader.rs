@@ -1,5 +1,5 @@
 use bevy::{
-    ecs::query::{ReadOnlyWorldQuery, WorldQuery},
+    ecs::query::{QueryData, QueryFilter, ReadOnlyQueryData},
     prelude::*,
 };
 
@@ -39,7 +39,7 @@ pub struct UiNavEventReader<'w, 's, 'a, T: Event + UiNavEvent> {
 }
 impl<'w, 's, 'a, T: Event + UiNavEvent> UiNavEventReader<'w, 's, 'a, T> {
     /// Iterate over query items pointed to by the events.
-    pub fn in_query<'b, 'c: 'b, Q: ReadOnlyWorldQuery, F: ReadOnlyWorldQuery>(
+    pub fn in_query<'b, 'c: 'b, Q: ReadOnlyQueryData, F: QueryFilter>(
         &'b mut self,
         query: &'c Query<Q, F>,
     ) -> impl Iterator<Item = Q::Item<'c>> + 'b {
@@ -49,7 +49,7 @@ impl<'w, 's, 'a, T: Event + UiNavEvent> UiNavEventReader<'w, 's, 'a, T> {
     /// Run `for_each` with result of `query` for each event entity.
     ///
     /// Unlike [`Self::in_query`] this works with mutable queries.
-    pub fn in_query_foreach_mut<Q: WorldQuery, F: ReadOnlyWorldQuery>(
+    pub fn in_query_foreach_mut<Q: QueryData, F: QueryFilter>(
         &mut self,
         query: &mut Query<Q, F>,
         mut for_each: impl FnMut(Q::Item<'_>),

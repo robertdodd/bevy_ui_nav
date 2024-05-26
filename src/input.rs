@@ -142,9 +142,9 @@ fn get_gamepad_axes(
 
 pub fn update_input_manager(
     input: &mut UiNavInputManager,
-    keys: &Input<KeyCode>,
+    keys: &ButtonInput<KeyCode>,
     gamepads: &Gamepads,
-    gamepad_buttons: &Input<GamepadButton>,
+    gamepad_buttons: &ButtonInput<GamepadButton>,
     gamepad_axis: &Axis<GamepadAxis>,
 ) {
     // update the previous state, and clear current state
