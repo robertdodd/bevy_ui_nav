@@ -64,6 +64,7 @@ pub fn spawn_button(
     text: impl Into<String>,
     focus: bool,
     disabled: bool,
+    mouse_only: bool,
     extras: impl Bundle,
 ) -> Entity {
     parent
@@ -71,7 +72,8 @@ pub fn spawn_button(
             StyledButton,
             Focusable::default()
                 .with_priority(focus)
-                .with_disabled(disabled),
+                .with_disabled(disabled)
+                .with_mouse_only(mouse_only),
             ButtonBundle {
                 style: Style {
                     align_items: AlignItems::Center,

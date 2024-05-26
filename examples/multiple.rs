@@ -56,6 +56,20 @@ fn startup(mut commands: Commands) {
     let mut graphics_menu = None;
     let mut sound_menu = None;
 
+    // Spawn a button that can only be triggered by clicking it
+    commands
+        .spawn(NodeBundle {
+            style: Style {
+                width: Val::Percent(100.),
+                margin: UiRect::vertical(Val::Px(20.)),
+                ..default()
+            },
+            ..default()
+        })
+        .with_children(|p| {
+            spawn_button(p, "Quit", true, false, true, ButtonAction::Quit);
+        });
+
     commands
         .spawn((
             MenuScroll,
@@ -63,9 +77,6 @@ fn startup(mut commands: Commands) {
                 style: Style {
                     width: Val::Percent(100.),
                     height: Val::Percent(100.),
-                    // flex_direction: FlexDirection::Column,
-                    // align_items: AlignItems::Center,
-                    // justify_content: JustifyContent::Center,
                     ..default()
                 },
                 ..default()
@@ -98,10 +109,18 @@ fn startup(mut commands: Commands) {
                 "Graphics",
                 true,
                 false,
+                false,
                 ButtonAction::Menu(graphics_menu),
             );
-            spawn_button(p, "Sound", false, false, ButtonAction::Menu(sound_menu));
-            spawn_button(p, "Quit", false, false, ButtonAction::Quit);
+            spawn_button(
+                p,
+                "Sound",
+                false,
+                false,
+                false,
+                ButtonAction::Menu(sound_menu),
+            );
+            spawn_button(p, "Quit", false, false, false, ButtonAction::Quit);
         });
 
         // Add buttons to graphics settings menu
@@ -114,6 +133,7 @@ fn startup(mut commands: Commands) {
                     "Option 1",
                     true,
                     false,
+                    false,
                     ButtonAction::Debug("Graphics Option 1".to_string()),
                 );
                 spawn_button(
@@ -121,9 +141,17 @@ fn startup(mut commands: Commands) {
                     "Option 2",
                     false,
                     false,
+                    false,
                     ButtonAction::Debug("Graphics Option 2".to_string()),
                 );
-                spawn_button(p, "Cancel", false, false, ButtonAction::Menu(settings_menu));
+                spawn_button(
+                    p,
+                    "Cancel",
+                    false,
+                    false,
+                    false,
+                    ButtonAction::Menu(settings_menu),
+                );
             });
 
         // Add buttons to sound settings menu
@@ -136,6 +164,7 @@ fn startup(mut commands: Commands) {
                     "Option 1",
                     true,
                     false,
+                    false,
                     ButtonAction::Debug("Sound Option 1".to_string()),
                 );
                 spawn_button(
@@ -143,9 +172,17 @@ fn startup(mut commands: Commands) {
                     "Option 2",
                     false,
                     false,
+                    false,
                     ButtonAction::Debug("Sound Option 2".to_string()),
                 );
-                spawn_button(p, "Cancel", false, false, ButtonAction::Menu(settings_menu));
+                spawn_button(
+                    p,
+                    "Cancel",
+                    false,
+                    false,
+                    false,
+                    ButtonAction::Menu(settings_menu),
+                );
             });
     }
 }

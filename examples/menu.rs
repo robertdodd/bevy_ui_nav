@@ -44,15 +44,15 @@ fn startup(mut commands: Commands) {
         .with_children(|p| {
             // spawn a menu
             spawn_menu(true, false, p, (), |p| {
-                spawn_button(p, "Option 1", true, false, ButtonAction::Option1);
-                spawn_button(p, "Option 2", false, false, ButtonAction::Option2);
-                spawn_button(p, "Disabled", false, true, ButtonAction::Option2);
+                spawn_button(p, "Option 1", true, false, false, ButtonAction::Option1);
+                spawn_button(p, "Option 2", false, false, false, ButtonAction::Option2);
+                spawn_button(p, "Disabled", false, true, false, ButtonAction::Option2);
             });
 
             // spawn a second menu
             spawn_menu(false, false, p, (), |p| {
-                spawn_button(p, "Save", true, false, ButtonAction::Save);
-                spawn_button(p, "Quit", false, false, ButtonAction::Quit);
+                spawn_button(p, "Save", true, false, false, ButtonAction::Save);
+                spawn_button(p, "Quit", false, false, false, ButtonAction::Quit);
             });
         });
 }

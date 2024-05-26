@@ -66,9 +66,9 @@ fn startup(mut commands: Commands) {
         })
         .with_children(|p| {
             spawn_menu(true, false, p, MainMenu, |p| {
-                spawn_button(p, "Option 1", true, true, ButtonAction::Option1);
-                spawn_button(p, "Option 2", false, true, ButtonAction::Option2);
-                spawn_button(p, "Quit", false, true, ButtonAction::Quit);
+                spawn_button(p, "Option 1", true, true, false, ButtonAction::Option1);
+                spawn_button(p, "Option 2", false, true, false, ButtonAction::Option2);
+                spawn_button(p, "Quit", false, true, false, ButtonAction::Quit);
             });
         });
 }

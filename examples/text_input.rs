@@ -134,8 +134,8 @@ fn startup(mut commands: Commands) {
                 spawn_text_control(p, "", true, ());
 
                 // Save and cancel buttons
-                spawn_button(p, "Reset", false, false, ButtonAction::Reset);
-                spawn_button(p, "Quit", false, false, ButtonAction::Quit);
+                spawn_button(p, "Reset", false, false, false, ButtonAction::Reset);
+                spawn_button(p, "Quit", false, false, false, ButtonAction::Quit);
             });
         });
 }
