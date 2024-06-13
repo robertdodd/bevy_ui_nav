@@ -10,6 +10,7 @@ pub(crate) struct FocusTarget {
     pub is_prefer: bool,
     pub is_in_direction: bool,
     pub is_in_axis: bool,
+    pub overlap: f32,
 }
 
 /// Type used internally to define a focus node's position and size.
@@ -38,48 +39,29 @@ impl FocusNode {
         let self_points = self.get_points();
         let other_points = other.get_points();
 
-        let min_x_self = self_points
+        let min_self = self_points
             .iter()
-            .map(|p| p.x)
-            .reduce(|acc, e| if e < acc { e } else { acc });
-        let max_x_self = self_points
+            .fold(self_points[0], |acc, &e| acc.min(e));
+        let max_self = self_points
             .iter()
-            .map(|p| p.x)
-            .reduce(|acc, e| if e > acc { e } else { acc });
-        let min_y_self = self_points
+            .fold(self_points[0], |acc, &e| acc.max(e));
+        let min_other = other_points
             .iter()
-            .map(|p| p.y)
-            .reduce(|acc, e| if e < acc { e } else { acc });
-        let max_y_self = self_points
+            .fold(other_points[0], |acc, &e| acc.min(e));
+        let max_other = other_points
             .iter()
-            .map(|p| p.y)
-            .reduce(|acc, e| if e > acc { e } else { acc });
+            .fold(other_points[0], |acc, &e| acc.max(e));
 
-        let min_x_other = other_points
-            .iter()
-            .map(|p| p.x)
-            .reduce(|acc, e| if e < acc { e } else { acc });
-        let max_x_other = other_points
-            .iter()
-            .map(|p| p.x)
-            .reduce(|acc, e| if e > acc { e } else { acc });
-        let min_y_other = other_points
-            .iter()
-            .map(|p| p.y)
-            .reduce(|acc, e| if e < acc { e } else { acc });
-        let max_y_other = other_points
-            .iter()
-            .map(|p| p.y)
-            .reduce(|acc, e| if e > acc { e } else { acc });
+        let is_left = min_other.x < min_self.x;
+        let is_right = max_other.x > max_self.x;
+        let is_up = min_other.y < min_self.y;
+        let is_down = max_other.y > max_self.y;
 
-        let is_left = min_x_other < min_x_self;
-        let is_right = max_x_other > max_x_self;
-        let is_up = min_y_other < min_y_self;
-        let is_down = max_y_other > max_y_self;
+        let overlap_x = compute_overlap(min_self.x, max_self.x, min_other.x, max_other.x);
+        let overlap_y = compute_overlap(min_self.y, max_self.y, min_other.y, max_other.y);
 
-        // x1 <= y2 && y1 <= x2
-        let is_overlap_x = min_y_self <= max_y_other && min_y_other <= max_y_self;
-        let is_overlap_y = min_x_self <= max_x_other && min_x_other <= max_x_self;
+        let is_overlap_x = overlap_y > 0.;
+        let is_overlap_y = overlap_x > 0.;
 
         let distance = self_points
             .iter()
@@ -101,8 +83,18 @@ impl FocusNode {
             is_overlap_x,
             is_overlap_y,
             total: distance,
+            overlap_x,
+            overlap_y,
         }
     }
+}
+
+fn compute_overlap(min_a: f32, max_a: f32, min_b: f32, max_b: f32) -> f32 {
+    let min = min_a.min(min_b);
+    let max = max_a.max(max_b);
+    let size_a = max_a - min_a;
+    let size_b = max_b - min_b;
+    (size_a + size_b) - (max - min)
 }
 
 /// Type used internally to describe the direction and distance between two nodes, and whether they overlap along any
@@ -116,6 +108,8 @@ pub(crate) struct FocusNodeDistance {
     pub is_overlap_x: bool,
     pub is_overlap_y: bool,
     pub total: f32,
+    pub overlap_x: f32,
+    pub overlap_y: f32,
 }
 
 impl FocusNodeDistance {

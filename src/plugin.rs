@@ -440,7 +440,7 @@ fn handle_internal_focus_move_events(
                         && !focusable.is_mouse_only
                         && focusable.menu == Some(current_menu_entity)
                 })
-                // convert to focus node
+                // map to a `FocusTarget` type
                 .map(|(entity, _, node, global_transform)| {
                     let size = FocusNode {
                         size: node.size(),
@@ -457,16 +457,21 @@ fn handle_internal_focus_move_events(
                             UiNavDirection::Left | UiNavDirection::Right => distance.is_overlap_x,
                             _ => false,
                         },
+                        overlap: match event.0 {
+                            UiNavDirection::Up | UiNavDirection::Down => distance.overlap_x,
+                            UiNavDirection::Left | UiNavDirection::Right => distance.overlap_y,
+                            _ => 0.,
+                        },
                         distance,
                     }
                 })
                 // Remove any nodes that do not lie along the axis of the movement event. If wrapping is enabled,
                 // allow any nodes along the axis. Otherwise, only allow nodes in the direction of the movement event.
-                .filter(|focus_node| {
+                .filter(|focus_target| {
                     if current_menu.is_wrap {
-                        focus_node.is_in_axis
+                        focus_target.is_in_axis
                     } else {
-                        focus_node.is_in_direction
+                        focus_target.is_in_direction
                     }
                 })
                 .fold(
@@ -482,7 +487,8 @@ fn handle_internal_focus_move_events(
                             // Prefer `e` if it lies in the correct direction and is closer than `acc_nearest`
                             if e_is_in_direction
                                 && ((acc_nearest.is_prefer == e.is_prefer
-                                    && e.distance.total < acc_nearest.distance.total)
+                                    && (e.distance.total < acc_nearest.distance.total
+                                        || e.overlap > acc_nearest.overlap))
                                     || (!acc_nearest.is_prefer && e.is_prefer))
                             {
                                 Some(e.clone())
@@ -505,7 +511,8 @@ fn handle_internal_focus_move_events(
                             // movement event.
                             if !e_is_in_direction
                                 && ((acc_furthest.is_prefer == e.is_prefer
-                                    && e.distance.total > acc_furthest.distance.total)
+                                    && (e.distance.total > acc_furthest.distance.total
+                                        || e.overlap > acc_furthest.overlap))
                                     || (!acc_furthest.is_prefer && e.is_prefer))
                             {
                                 Some(e.clone())
