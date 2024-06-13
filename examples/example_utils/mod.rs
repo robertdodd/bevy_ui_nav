@@ -11,13 +11,13 @@ impl Plugin for ExampleUtilsPlugin {
     }
 }
 
-const BUTTON_BG_DEFAULT: Color = Color::DARK_GRAY;
-const BUTTON_BG_ACTIVE: Color = Color::GRAY;
-const BUTTON_BG_PRESS: Color = Color::BLACK;
-const BUTTON_BG_DISABLED: Color = Color::BEIGE;
+pub const BUTTON_BG_DEFAULT: Color = Color::DARK_GRAY;
+pub const BUTTON_BG_ACTIVE: Color = Color::GRAY;
+pub const BUTTON_BG_PRESS: Color = Color::BLACK;
+pub const BUTTON_BG_DISABLED: Color = Color::BEIGE;
 
 #[derive(Component)]
-struct StyledButton;
+pub struct StyledButton;
 
 /// Utility that spawns a nav menu.
 pub fn spawn_menu(
