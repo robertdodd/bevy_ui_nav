@@ -526,7 +526,7 @@ fn handle_internal_focus_move_events(
             if let Some(nearest) = nearest {
                 set_focus_writer.send(InternalSetFocusEvent::new_button(nearest.entity));
             } else if let (Some(furthest), true) = (furthest, current_menu.is_wrap) {
-                println!("No nearest, wrapping around");
+                // No nearest, wrapping around
                 set_focus_writer.send(InternalSetFocusEvent::new_button(furthest.entity));
             }
         }
