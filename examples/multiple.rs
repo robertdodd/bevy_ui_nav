@@ -67,7 +67,7 @@ fn startup(mut commands: Commands) {
             ..default()
         })
         .with_children(|p| {
-            spawn_button(p, "Quit", true, false, true, ButtonAction::Quit);
+            menu_button(p, "Quit", true, false, true, ButtonAction::Quit);
         });
 
     commands
@@ -85,17 +85,17 @@ fn startup(mut commands: Commands) {
         .with_children(|p| {
             // Main Menu
             settings_menu = Some(spawn_menu(true, false, p, MainMenu, |p| {
-                spawn_title("Settings", (), p);
+                menu_title(p, "Settings");
             }));
 
             // Graphics Menu
             graphics_menu = Some(spawn_menu(false, false, p, MainMenu, |p| {
-                spawn_title("Graphics", (), p);
+                menu_title(p, "Graphics");
             }));
 
             // Sound Menu
             sound_menu = Some(spawn_menu(false, false, p, MainMenu, |p| {
-                spawn_title("Sound", (), p);
+                menu_title(p, "Sound");
             }));
         });
 
@@ -104,7 +104,7 @@ fn startup(mut commands: Commands) {
     {
         // Add buttons to main settings menu
         commands.entity(settings_menu).with_children(|p| {
-            spawn_button(
+            menu_button(
                 p,
                 "Graphics",
                 true,
@@ -112,7 +112,7 @@ fn startup(mut commands: Commands) {
                 false,
                 ButtonAction::Menu(graphics_menu),
             );
-            spawn_button(
+            menu_button(
                 p,
                 "Sound",
                 false,
@@ -120,7 +120,7 @@ fn startup(mut commands: Commands) {
                 false,
                 ButtonAction::Menu(sound_menu),
             );
-            spawn_button(p, "Quit", false, false, false, ButtonAction::Quit);
+            menu_button(p, "Quit", false, false, false, ButtonAction::Quit);
         });
 
         // Add buttons to graphics settings menu
@@ -128,7 +128,7 @@ fn startup(mut commands: Commands) {
             .entity(graphics_menu)
             .insert(MenuParent(settings_menu))
             .with_children(|p| {
-                spawn_button(
+                menu_button(
                     p,
                     "Option 1",
                     true,
@@ -136,7 +136,7 @@ fn startup(mut commands: Commands) {
                     false,
                     ButtonAction::Debug("Graphics Option 1".to_string()),
                 );
-                spawn_button(
+                menu_button(
                     p,
                     "Option 2",
                     false,
@@ -144,7 +144,7 @@ fn startup(mut commands: Commands) {
                     false,
                     ButtonAction::Debug("Graphics Option 2".to_string()),
                 );
-                spawn_button(
+                menu_button(
                     p,
                     "Cancel",
                     false,
@@ -159,7 +159,7 @@ fn startup(mut commands: Commands) {
             .entity(sound_menu)
             .insert(MenuParent(settings_menu))
             .with_children(|p| {
-                spawn_button(
+                menu_button(
                     p,
                     "Option 1",
                     true,
@@ -167,7 +167,7 @@ fn startup(mut commands: Commands) {
                     false,
                     ButtonAction::Debug("Sound Option 1".to_string()),
                 );
-                spawn_button(
+                menu_button(
                     p,
                     "Option 2",
                     false,
@@ -175,7 +175,7 @@ fn startup(mut commands: Commands) {
                     false,
                     ButtonAction::Debug("Sound Option 2".to_string()),
                 );
-                spawn_button(
+                menu_button(
                     p,
                     "Cancel",
                     false,
