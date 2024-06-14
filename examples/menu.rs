@@ -29,32 +29,20 @@ enum ButtonAction {
 fn startup(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 
-    commands
-        .spawn(NodeBundle {
-            style: Style {
-                width: Val::Percent(100.),
-                height: Val::Percent(100.),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                ..default()
-            },
-            ..default()
-        })
-        .with_children(|p| {
-            // spawn a menu
-            spawn_menu(true, false, p, (), |p| {
-                spawn_button(p, "Option 1", true, false, false, ButtonAction::Option1);
-                spawn_button(p, "Option 2", false, false, false, ButtonAction::Option2);
-                spawn_button(p, "Disabled", false, true, false, ButtonAction::Option2);
-            });
-
-            // spawn a second menu
-            spawn_menu(false, false, p, (), |p| {
-                spawn_button(p, "Save", true, false, false, ButtonAction::Save);
-                spawn_button(p, "Quit", false, false, false, ButtonAction::Quit);
-            });
+    root_full_screen_centered(&mut commands, |p| {
+        // spawn a menu
+        spawn_menu(true, false, p, (), |p| {
+            menu_button(p, "Option 1", true, false, false, ButtonAction::Option1);
+            menu_button(p, "Option 2", false, false, false, ButtonAction::Option2);
+            menu_button(p, "Disabled", false, true, false, ButtonAction::Option2);
         });
+
+        // spawn a second menu
+        spawn_menu(false, false, p, (), |p| {
+            menu_button(p, "Save", true, false, false, ButtonAction::Save);
+            menu_button(p, "Quit", false, false, false, ButtonAction::Quit);
+        });
+    });
 }
 
 fn handle_click_events(

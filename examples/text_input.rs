@@ -110,34 +110,22 @@ fn spawn_text_control(
 fn startup(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 
-    commands
-        .spawn(NodeBundle {
-            style: Style {
-                width: Val::Percent(100.),
-                height: Val::Percent(100.),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                ..default()
-            },
-            ..default()
-        })
-        .with_children(|p| {
-            spawn_menu(true, false, p, (), |p| {
-                // title
-                p.spawn((
-                    TextBundle::from_sections(["Name: ".into(), "".into()]),
-                    TitleLabel,
-                ));
+    root_full_screen_centered(&mut commands, |p| {
+        spawn_menu(true, false, p, (), |p| {
+            // title
+            p.spawn((
+                TextBundle::from_sections(["Name: ".into(), "".into()]),
+                TitleLabel,
+            ));
 
-                // text control
-                spawn_text_control(p, "", true, ());
+            // text control
+            spawn_text_control(p, "", true, ());
 
-                // Save and cancel buttons
-                spawn_button(p, "Reset", false, false, false, ButtonAction::Reset);
-                spawn_button(p, "Quit", false, false, false, ButtonAction::Quit);
-            });
+            // Save and cancel buttons
+            menu_button(p, "Reset", false, false, false, ButtonAction::Reset);
+            menu_button(p, "Quit", false, false, false, ButtonAction::Quit);
         });
+    });
 }
 
 /// System that updates the style of text controls when their focus state changes

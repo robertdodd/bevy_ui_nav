@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::types::*;
 
 /// Component defining a menu that contains `Focusable` entities.
-#[derive(Component, Default, Debug)]
+#[derive(Component, Default, Debug, Clone)]
 pub struct NavMenu {
     /// Whether this menu should be made active when it is spawned. Changing this value after it is spawned will not
     /// have any effect.

@@ -50,41 +50,26 @@ enum ButtonAction {
 fn startup(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 
-    commands
-        .spawn((
-            MenuScroll,
-            NodeBundle {
+    root_full_screen_centered(&mut commands, |p| {
+        spawn_menu(true, false, p, MainMenu, |p| {
+            menu_button(p, "Option 1", true, false, false, ButtonAction::Option1);
+            menu_button(p, "Disabled", false, true, false, ButtonAction::Option2);
+            menu_button(p, "Option 2", false, false, false, ButtonAction::Option2);
+            p.spawn(NodeBundle {
                 style: Style {
-                    width: Val::Percent(100.),
-                    height: Val::Percent(100.),
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Center,
-                    justify_content: JustifyContent::Center,
+                    flex_direction: FlexDirection::Row,
+                    width: Val::Px(500.),
+                    justify_content: JustifyContent::SpaceBetween,
                     ..default()
                 },
                 ..default()
-            },
-        ))
-        .with_children(|p| {
-            spawn_menu(true, false, p, MainMenu, |p| {
-                spawn_button(p, "Option 1", true, false, false, ButtonAction::Option1);
-                spawn_button(p, "Disabled", false, true, false, ButtonAction::Option2);
-                spawn_button(p, "Option 2", false, false, false, ButtonAction::Option2);
-                p.spawn(NodeBundle {
-                    style: Style {
-                        flex_direction: FlexDirection::Row,
-                        width: Val::Px(500.),
-                        justify_content: JustifyContent::SpaceBetween,
-                        ..default()
-                    },
-                    ..default()
-                })
-                .with_children(|p| {
-                    spawn_button(p, "Cancel", false, false, false, ButtonAction::Quit);
-                    spawn_button(p, "Save", false, false, false, ButtonAction::Save);
-                });
+            })
+            .with_children(|p| {
+                menu_button(p, "Cancel", false, false, false, ButtonAction::Quit);
+                menu_button(p, "Save", false, false, false, ButtonAction::Save);
             });
         });
+    });
 }
 
 fn handle_scroll(keys: Res<ButtonInput<KeyCode>>, mut query: Query<&mut Style, With<MenuScroll>>) {

@@ -25,41 +25,39 @@ fn main() {
 fn startup(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 
-    // Spawn multiple buttons in a grid, with no spacing between them, to check that navigation works correctly.
     let n_columns = 4;
-    commands
+
+    // Spawn multiple buttons in a grid, with no spacing between them, to check that navigation works correctly.
+    root_full_screen_centered(&mut commands, |p| {
+        spawn_menu(true, false, p, (), |p| {
+            button_grid(p, n_columns, |p| {
+                for i in 0..(n_columns * n_columns) {
+                    let title = format!("Button {}", i + 1);
+                    spawn_grid_button(p, title.clone(), Name::new(title));
+                }
+            });
+        });
+    });
+}
+
+fn button_grid(
+    parent: &mut ChildBuilder,
+    n_columns: u16,
+    children: impl FnOnce(&mut ChildBuilder),
+) {
+    parent
         .spawn(NodeBundle {
             style: Style {
                 width: Val::Percent(100.),
-                height: Val::Percent(100.),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
+                display: Display::Grid,
+                grid_template_columns: RepeatedGridTrack::auto(n_columns),
+                grid_template_rows: RepeatedGridTrack::min_content(1),
+                justify_content: JustifyContent::SpaceBetween,
                 ..default()
             },
             ..default()
         })
-        .with_children(|p| {
-            spawn_menu(true, false, p, (), |p| {
-                p.spawn(NodeBundle {
-                    style: Style {
-                        width: Val::Percent(100.),
-                        display: Display::Grid,
-                        grid_template_columns: RepeatedGridTrack::auto(n_columns),
-                        grid_template_rows: RepeatedGridTrack::min_content(1),
-                        justify_content: JustifyContent::SpaceBetween,
-                        ..default()
-                    },
-                    ..default()
-                })
-                .with_children(|p| {
-                    for i in 0..(n_columns * n_columns) {
-                        let title = format!("Button {}", i + 1);
-                        spawn_grid_button(p, title.clone(), Name::new(title));
-                    }
-                });
-            });
-        });
+        .with_children(children);
 }
 
 /// Utility that spawns a button for the grid.
