@@ -1,22 +1,28 @@
-use bevy::{input::mouse::MouseButtonInput, prelude::*, ui::RelativeCursorPosition};
+use bevy::{
+    input::{keyboard::KeyboardInput, mouse::MouseButtonInput, ButtonState},
+    prelude::*,
+    ui::RelativeCursorPosition,
+};
 
 use crate::{
-    components::*, default_input_map::DEFAULT_INPUT_MAP, events::*, focus_node::*, input::*,
-    resources::*, types::*, utils::*,
+    components::*,
+    default_input_map::DEFAULT_INPUT_MAP,
+    events::*,
+    input::*,
+    resources::*,
+    spatial_map::{UiSpatialMap, UiSpatialMapEvent},
+    types::*,
+    utils::*,
 };
 
 pub struct BevyUiNavPlugin;
 
 impl Plugin for BevyUiNavPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<InternalSetFocusEvent>()
-            .add_event::<InternalFocusMoveEvent>()
-            .add_event::<InternalActionButtonEvent>()
-            .add_event::<UiNavClickEvent>()
+        app.add_event::<UiNavClickEvent>()
             .add_event::<UiNavLockEvent>()
             .add_event::<UiNavCancelEvent>()
             .add_event::<NavRequest>()
-            .add_event::<InternalRefreshEvent>()
             .add_event::<UiNavFocusChangedEvent>()
             .init_resource::<UiNavState>()
             .init_resource::<UiNavSettings>()
@@ -35,29 +41,21 @@ impl Plugin for BevyUiNavPlugin {
                             setup_new_focusables,
                         )
                             .chain(),
-                        handle_input,
-                        tick_pressed_timer,
                         (
-                            handle_focusable_changed,
-                            handle_internal_refresh_events
-                                .run_if(on_event::<InternalRefreshEvent>()),
+                            handle_interactions.run_if(
+                                on_event::<CursorMoved>().or_else(on_event::<MouseButtonInput>()),
+                            ),
+                            handle_gamepad_input,
+                            handle_keyboard_input,
                         )
                             .chain(),
+                        tick_pressed_timer,
+                        handle_focusable_changed,
                     )
                         .before(UiNavSet),
                     (
-                        handle_input,
-                        handle_interactions.run_if(
-                            on_event::<CursorMoved>().or_else(on_event::<MouseButtonInput>()),
-                        ),
-                        handle_nav_requests,
+                        handle_nav_requests.run_if(on_event::<NavRequest>()),
                         handle_lock_events.run_if(on_event::<UiNavLockEvent>()),
-                        handle_internal_focus_move_events
-                            .run_if(on_event::<InternalFocusMoveEvent>()),
-                        handle_internal_set_focus_events
-                            .run_if(on_event::<InternalSetFocusEvent>()),
-                        handle_internal_action_button_events
-                            .run_if(on_event::<InternalActionButtonEvent>()),
                     )
                         .chain()
                         .in_set(UiNavSet),
@@ -79,7 +77,7 @@ fn setup_new_menus(
     query: Query<(Entity, &NavMenu), Added<NavMenu>>,
     menu_query: Query<(), With<NavMenu>>,
     mut nav_state: ResMut<UiNavState>,
-    mut refresh_writer: EventWriter<InternalRefreshEvent>,
+    mut nav_request_writer: EventWriter<NavRequest>,
 ) {
     if query.is_empty() {
         return;
@@ -109,7 +107,7 @@ fn setup_new_menus(
         }
     }
 
-    refresh_writer.send(InternalRefreshEvent);
+    nav_request_writer.send(NavRequest::Refresh);
 }
 
 /// System that initializes newly added focusables.
@@ -261,7 +259,7 @@ fn handle_interactions(
             {
                 click_writer.send(UiNavClickEvent(entity));
             }
-            // udpate focusable
+            // update focusable
             focusable.is_pressed_interaction = is_pressed;
             focusable.is_pressed_interaction_from_active = !is_blocked;
         }
@@ -283,94 +281,11 @@ fn handle_interactions(
     }
 }
 
-/// System that handles `FocusEvent` events.
-///
-/// `FocusEvent` events are used to set focus to a specific element.
-///
-/// If multiple events are received, only the first one is performed, and the others are ignored.
-fn handle_internal_set_focus_events(
-    mut events: EventReader<InternalSetFocusEvent>,
-    mut focusable_query: Query<(Entity, &mut Focusable)>,
-    menu_query: Query<(), With<NavMenu>>,
-    mut nav_state: ResMut<UiNavState>,
-    mut nav_event_writer: EventWriter<UiNavFocusChangedEvent>,
-) {
-    // Exit if focus if locked
-    // IMPORTANT: We must consume the event reader
-    if nav_state.locked {
-        events.clear();
-        return;
-    }
-
-    let mut new_focused = None;
-    for event in events.read() {
-        if menu_query.contains(event.entity) {
-            // The focus event was for a menu, so find the first focusable in that menu, preferring prioritized ones
-            new_focused = focusable_query
-                .iter()
-                .filter(|(_, focusable)| focusable.menu == Some(event.entity))
-                .reduce(|acc, e| {
-                    if !acc.1.is_priority && e.1.is_priority {
-                        e
-                    } else {
-                        acc
-                    }
-                })
-                .map(|(entity, _)| (entity, event.interaction_type, false));
-        } else if let Ok((_, focusable)) = focusable_query.get(event.entity) {
-            if !focusable.is_disabled {
-                new_focused = Some((
-                    event.entity,
-                    event.interaction_type,
-                    focusable.is_mouse_only,
-                ));
-            }
-        } else {
-            error!("FocusEvent query failed");
-        }
-    }
-
-    // remove focus from other entities
-    if let Some((new_focused, interaction_type, is_mouse_only)) = new_focused {
-        if is_mouse_only {
-            if let Ok((_, mut focusable)) = focusable_query.get_mut(new_focused) {
-                focusable.is_focused = true;
-            }
-        } else {
-            for (entity, mut focusable) in focusable_query.iter_mut() {
-                // Ignore "mouse_only" focusables
-                if focusable.is_mouse_only {
-                    continue;
-                }
-
-                // define whether this focusable should be focused and update the focus state if it changed
-                let new_is_focused = if entity == new_focused && focusable.menu.is_some() {
-                    nav_state.menu = focusable.menu;
-                    true
-                } else {
-                    false
-                };
-                if new_is_focused != focusable.is_focused {
-                    focusable.is_focused = new_is_focused;
-
-                    // send an event notifying about this focus change
-                    if new_is_focused && !focusable.is_mouse_only {
-                        nav_event_writer.send(UiNavFocusChangedEvent {
-                            entity,
-                            interaction_type,
-                        });
-                    }
-                }
-            }
-        }
-    }
-}
-
 /// System that clears the current menu when it is removed.
 fn handle_current_menu_removed(
     mut removed: RemovedComponents<NavMenu>,
     mut nav_state: ResMut<UiNavState>,
-    mut refresh_writer: EventWriter<InternalRefreshEvent>,
+    mut nav_request_writer: EventWriter<NavRequest>,
 ) {
     for entity in removed.read() {
         if Some(entity) == nav_state.menu {
@@ -379,208 +294,7 @@ fn handle_current_menu_removed(
         }
     }
 
-    refresh_writer.send(InternalRefreshEvent);
-}
-
-/// System that handles `FocusMoveEvent` events.
-///
-/// `FocusMoveEvent` events are used to move focus in a specific direction.
-fn handle_internal_focus_move_events(
-    mut events: EventReader<InternalFocusMoveEvent>,
-    query: Query<(Entity, &Focusable, &Node, &GlobalTransform)>,
-    mut set_focus_writer: EventWriter<InternalSetFocusEvent>,
-    nav_state: Res<UiNavState>,
-    menu_query: Query<&NavMenu>,
-) {
-    // Exit if focus if locked
-    // IMPORTANT: We must consume the event reader
-    if nav_state.locked {
-        events.clear();
-        return;
-    }
-
-    // get current menu, exit if there isn't one
-    // TODO: Do not exit if no current menu. Loop over all focusables and clear their state if not in active menu.
-    let current_menu = nav_state.menu.and_then(|e| menu_query.get(e).ok());
-    if current_menu.is_none() {
-        return;
-    }
-    let current_menu_entity = nav_state.menu.unwrap();
-    let current_menu = current_menu.unwrap();
-
-    // Find the currently focused element
-    let current = query
-        .iter()
-        .find(|(_, focusable, _, _)| {
-            focusable.active()
-                && focusable.menu == Some(current_menu_entity)
-                && !focusable.is_disabled
-                && !focusable.is_mouse_only
-        })
-        .map(|(_, focusable, node, global_transform)| {
-            let focus_node = FocusNode {
-                size: node.size(),
-                position: global_transform.compute_transform().translation.truncate(),
-            };
-            let is_blocked = focusable.is_pressed();
-            (focus_node, is_blocked)
-        });
-
-    if let Some((current, is_blocked)) = current {
-        if is_blocked {
-            return;
-        }
-        for event in events.read() {
-            let (nearest, furthest) = query
-                .iter()
-                // skip active
-                .filter(|(_, focusable, _, _)| {
-                    !focusable.active()
-                        && !focusable.is_disabled
-                        && !focusable.is_mouse_only
-                        && focusable.menu == Some(current_menu_entity)
-                })
-                // map to a `FocusTarget` type
-                .map(|(entity, _, node, global_transform)| {
-                    let size = FocusNode {
-                        size: node.size(),
-                        position: global_transform.compute_transform().translation.truncate(),
-                    };
-                    let distance = current.distance_to(&size);
-                    FocusTarget {
-                        entity,
-                        is_in_direction: distance.is_in_direction(event.0),
-                        is_in_axis: distance.is_along_axis(event.0),
-                        // Only prefer movement along direct axes. It doesn't matter when moving diagonally.
-                        is_prefer: match event.0 {
-                            UiNavDirection::Up | UiNavDirection::Down => distance.is_overlap_y,
-                            UiNavDirection::Left | UiNavDirection::Right => distance.is_overlap_x,
-                            _ => false,
-                        },
-                        overlap: match event.0 {
-                            UiNavDirection::Up | UiNavDirection::Down => distance.overlap_x,
-                            UiNavDirection::Left | UiNavDirection::Right => distance.overlap_y,
-                            _ => 0.,
-                        },
-                        distance,
-                    }
-                })
-                // Remove any nodes that do not lie along the axis of the movement event. If wrapping is enabled,
-                // allow any nodes along the axis. Otherwise, only allow nodes in the direction of the movement event.
-                .filter(|focus_target| {
-                    if current_menu.is_wrap {
-                        focus_target.is_in_axis
-                    } else {
-                        focus_target.is_in_direction
-                    }
-                })
-                .fold(
-                    (None, None),
-                    #[allow(clippy::type_complexity)]
-                    |(acc_nearest, acc_furthest),
-                     e|
-                     -> (Option<FocusTarget>, Option<FocusTarget>) {
-                        let e_is_in_direction = e.is_in_direction;
-
-                        // Fold the nearest focus node in the direction of the movement event
-                        let nearest = if let Some(acc_nearest) = acc_nearest {
-                            // Prefer `e` if it lies in the correct direction and is closer than `acc_nearest`
-                            if e_is_in_direction
-                                && ((acc_nearest.is_prefer == e.is_prefer
-                                    && (e.distance.total < acc_nearest.distance.total
-                                        || e.overlap > acc_nearest.overlap))
-                                    || (!acc_nearest.is_prefer && e.is_prefer))
-                            {
-                                Some(e.clone())
-                            } else {
-                                Some(acc_nearest)
-                            }
-                        } else if e_is_in_direction {
-                            // set the initial nearest node
-                            Some(e.clone())
-                        } else {
-                            None
-                        };
-
-                        // Fold the furthest focus node
-                        let furthest = if !current_menu.is_wrap {
-                            // skip if wrapping is disabled
-                            None
-                        } else if let Some(acc_furthest) = acc_furthest {
-                            // Prefer `e` if it is further than `acc_furthest` and does not lie in the dirction of the
-                            // movement event.
-                            if !e_is_in_direction
-                                && ((acc_furthest.is_prefer == e.is_prefer
-                                    && (e.distance.total > acc_furthest.distance.total
-                                        || e.overlap > acc_furthest.overlap))
-                                    || (!acc_furthest.is_prefer && e.is_prefer))
-                            {
-                                Some(e.clone())
-                            } else {
-                                Some(acc_furthest)
-                            }
-                        } else if !e_is_in_direction {
-                            // set the initial furthest node if it does not lie in the direction of the movement event
-                            Some(e.clone())
-                        } else {
-                            None
-                        };
-
-                        (nearest, furthest)
-                    },
-                );
-
-            if let Some(nearest) = nearest {
-                set_focus_writer.send(InternalSetFocusEvent::new_button(nearest.entity));
-            } else if let (Some(furthest), true) = (furthest, current_menu.is_wrap) {
-                // No nearest, wrapping around
-                set_focus_writer.send(InternalSetFocusEvent::new_button(furthest.entity));
-            }
-        }
-    } else {
-        error!("no current focusable");
-    }
-}
-
-/// System that handles action button events.
-fn handle_internal_action_button_events(
-    mut events: EventReader<InternalActionButtonEvent>,
-    mut query: Query<(Entity, &mut Focusable)>,
-    mut click_writer: EventWriter<UiNavClickEvent>,
-    nav_state: Res<UiNavState>,
-) {
-    // Exit if focus if locked
-    // IMPORTANT: We must consume the event reader
-    if nav_state.locked {
-        events.clear();
-        return;
-    }
-
-    for event in events.read() {
-        for (entity, mut focusable) in query.iter_mut() {
-            // ignore non-active focusables
-            if !focusable.active() || focusable.is_disabled || focusable.is_mouse_only {
-                continue;
-            }
-
-            // ignore down events if the focusable is already pressed via interaction
-            if event.0 == PressType::Press && focusable.is_pressed() {
-                continue;
-            }
-
-            // update the focusable and emit a click event on button up
-            let new_is_pressed_key = match event.0 {
-                PressType::Release => false,
-                PressType::Press => true,
-            };
-            if new_is_pressed_key != focusable.is_pressed_key {
-                focusable.is_pressed_key = new_is_pressed_key;
-                if !new_is_pressed_key {
-                    click_writer.send(UiNavClickEvent(entity));
-                }
-            }
-        }
-    }
+    nav_request_writer.send(NavRequest::Refresh);
 }
 
 /// System that reacts to `FocusLockEvent` events to lock or unlock navigation.
@@ -595,8 +309,7 @@ fn handle_lock_events(mut events: EventReader<UiNavLockEvent>, mut nav_state: Re
 
 /// System that listens for keyboard or gamepad input and emits the appropriate navigation events.
 #[allow(clippy::too_many_arguments)]
-fn handle_input(
-    keys: Res<ButtonInput<KeyCode>>,
+fn handle_gamepad_input(
     gamepads: Res<Gamepads>,
     gamepad_buttons: Res<ButtonInput<GamepadButton>>,
     gamepad_axis: Res<Axis<GamepadAxis>>,
@@ -607,7 +320,6 @@ fn handle_input(
 ) {
     update_input_manager(
         &mut input_manager,
-        &keys,
         &gamepads,
         &gamepad_buttons,
         &gamepad_axis,
@@ -660,50 +372,90 @@ fn handle_input(
 #[allow(clippy::too_many_arguments)]
 fn handle_nav_requests(
     mut events: EventReader<NavRequest>,
-    focusable_query: Query<(), With<Focusable>>,
-    menu_query: Query<&NavMenu>,
-    mut set_focus_writer: EventWriter<InternalSetFocusEvent>,
+    menu_query: Query<(Entity, &NavMenu)>,
     mut cancel_writer: EventWriter<UiNavCancelEvent>,
-    mut move_writer: EventWriter<InternalFocusMoveEvent>,
-    mut action_writer: EventWriter<InternalActionButtonEvent>,
-    nav_state: Res<UiNavState>,
+    mut nav_state: ResMut<UiNavState>,
+    mut query: Query<(Entity, &mut Focusable, &Node, &GlobalTransform)>,
+    mut click_writer: EventWriter<UiNavClickEvent>,
+    mut focus_change_writer: EventWriter<UiNavFocusChangedEvent>,
 ) {
-    if let Some(current_menu) = nav_state.menu {
-        let mut new_current = None;
-        let mut move_direction = None;
-        let mut action_press = None;
+    let mut spatial_map =
+        UiSpatialMap::from_query(&menu_query, &query.to_readonly(), nav_state.menu);
 
-        for event in events.read() {
-            match event {
-                NavRequest::SetFocus {
-                    entity: target,
-                    interaction_type,
-                } => {
-                    if focusable_query.contains(*target) || menu_query.contains(*target) {
-                        new_current = Some((*target, *interaction_type));
-                    }
-                }
-                NavRequest::Movement(direction) => {
-                    move_direction = Some(direction);
-                }
-                NavRequest::ActionPress => action_press = Some(PressType::Press),
-                NavRequest::ActionRelease => action_press = Some(PressType::Release),
-                NavRequest::Cancel => {
-                    cancel_writer.send(UiNavCancelEvent(current_menu));
-                }
-            }
-        }
-
-        // Handle events in the appropriate order
-        if let Some((entity, interaction_type)) = new_current {
-            set_focus_writer.send(InternalSetFocusEvent {
+    for event in events.read() {
+        match event {
+            NavRequest::SetFocus {
                 entity,
                 interaction_type,
-            });
-        } else if let Some(press_type) = action_press {
-            action_writer.send(InternalActionButtonEvent(press_type));
-        } else if let Some(direction) = move_direction {
-            move_writer.send(InternalFocusMoveEvent(*direction));
+            } => {
+                spatial_map.set_focus(*entity, *interaction_type);
+            }
+            NavRequest::Movement(direction) => {
+                spatial_map.apply_movement(*direction);
+            }
+            NavRequest::ActionPress => {
+                spatial_map.press();
+            }
+            NavRequest::ActionRelease => {
+                spatial_map.release();
+            }
+            NavRequest::Cancel => {
+                if let Some(Some(menu)) = spatial_map.get_new_menu() {
+                    cancel_writer.send(UiNavCancelEvent(menu));
+                }
+            }
+            NavRequest::Refresh => (),
+        }
+    }
+
+    for event in spatial_map.events() {
+        match event {
+            UiSpatialMapEvent::Press(entity) => {
+                if let Ok((_, mut focusable, _, _)) = query.get_mut(*entity) {
+                    focusable.is_pressed_key = true;
+                }
+            }
+            UiSpatialMapEvent::Release(entity) => {
+                if let Ok((_, mut focusable, _, _)) = query.get_mut(*entity) {
+                    focusable.is_pressed_key = false;
+                }
+            }
+            UiSpatialMapEvent::Click(entity) => {
+                click_writer.send(UiNavClickEvent(*entity));
+            }
+        }
+    }
+
+    // Focus on new menu
+    if let Some(new_menu) = spatial_map.get_new_menu() {
+        nav_state.menu = new_menu;
+    }
+
+    // Focus on new focusable
+    if let Some((new_focusable, interaction_type)) = spatial_map.get_new_focusable() {
+        for (entity, mut focusable, _, _) in query.iter_mut() {
+            focusable.is_focused = Some(entity) == new_focusable;
+            if focusable.is_focused {
+                focus_change_writer.send(UiNavFocusChangedEvent {
+                    entity,
+                    interaction_type,
+                });
+            }
+        }
+    }
+
+    // Focus on new mouse-only focusable
+    if let Some(new_focusable) = spatial_map.get_new_mouse_only_focusable() {
+        for (entity, mut focusable, _, _) in query.iter_mut() {
+            if focusable.is_mouse_only {
+                focusable.is_focused = Some(entity) == new_focusable;
+                if focusable.is_focused {
+                    focus_change_writer.send(UiNavFocusChangedEvent {
+                        entity,
+                        interaction_type: UiNavInteractionType::Mouse,
+                    });
+                }
+            }
         }
     }
 }
@@ -711,51 +463,51 @@ fn handle_nav_requests(
 /// System that refreshes the UI navigation state whenever a focusable changes.
 fn handle_focusable_changed(
     query: Query<(), Changed<Focusable>>,
-    mut refresh_writer: EventWriter<InternalRefreshEvent>,
+    mut nav_request_writer: EventWriter<NavRequest>,
 ) {
     if !query.is_empty() {
-        refresh_writer.send(InternalRefreshEvent);
+        nav_request_writer.send(NavRequest::Refresh);
     }
 }
 
-/// System that handles `RefreshFocusEvent` events
-fn handle_internal_refresh_events(
-    mut events: EventReader<InternalRefreshEvent>,
-    nav_state: Res<UiNavState>,
-    menu_query: Query<Entity, With<NavMenu>>,
-    focusable_query: Query<(Entity, &Focusable)>,
+/// This system prints out all keyboard events as they come in
+fn handle_keyboard_input(
+    mut events: EventReader<KeyboardInput>,
     mut nav_request_writer: EventWriter<NavRequest>,
+    input_manager: Res<UiNavInputManager>,
 ) {
-    events.clear();
-
-    // ensure that we have a current menu
-    let current_menu = nav_state.menu.and_then(|menu| menu_query.get(menu).ok());
-
-    // Find the current focusable
-    let current_focusable = focusable_query.iter().find(|(_, focusable)| {
-        focusable.active() && focusable.menu.is_some() && focusable.menu == current_menu
-    });
-
-    // If we don't have a focusable, find one in the current menu. Prefer one that has `is_priority` set to true,
-    // otherwise, use the first one we find.
-    if current_focusable.is_none() {
-        let new_focusable = focusable_query
-            .iter()
-            .filter(|(_, focusable)| {
-                focusable.menu == current_menu && !focusable.is_disabled && !focusable.is_mouse_only
-            })
-            .reduce(|acc, e| {
-                if e.1.is_priority && !acc.1.is_priority {
-                    e
-                } else {
-                    acc
+    if events.is_empty() {
+        return;
+    }
+    for event in events.read() {
+        for action in input_manager.input_map.iter() {
+            if let InputMapping::Key { keycode, action } = action {
+                if *keycode == event.key_code {
+                    let nav_request = match (action, event.state) {
+                        (ActionType::Up, ButtonState::Pressed) => {
+                            Some(NavRequest::Movement(UiNavDirection::Up))
+                        }
+                        (ActionType::Down, ButtonState::Pressed) => {
+                            Some(NavRequest::Movement(UiNavDirection::Down))
+                        }
+                        (ActionType::Left, ButtonState::Pressed) => {
+                            Some(NavRequest::Movement(UiNavDirection::Left))
+                        }
+                        (ActionType::Right, ButtonState::Pressed) => {
+                            Some(NavRequest::Movement(UiNavDirection::Right))
+                        }
+                        (ActionType::Action, ButtonState::Pressed) => Some(NavRequest::ActionPress),
+                        (ActionType::Action, ButtonState::Released) => {
+                            Some(NavRequest::ActionRelease)
+                        }
+                        (ActionType::Cancel, ButtonState::Pressed) => Some(NavRequest::Cancel),
+                        _ => None,
+                    };
+                    if let Some(nav_request) = nav_request {
+                        nav_request_writer.send(nav_request);
+                    }
                 }
-            });
-        if let Some((entity, _)) = new_focusable {
-            nav_request_writer.send(NavRequest::SetFocus {
-                entity,
-                interaction_type: UiNavInteractionType::Auto,
-            });
+            }
         }
     }
 }

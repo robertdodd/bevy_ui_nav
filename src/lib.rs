@@ -6,6 +6,7 @@ mod focus_node;
 mod input;
 mod plugin;
 mod resources;
+mod spatial_map;
 mod types;
 mod utils;
 

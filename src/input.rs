@@ -12,6 +12,18 @@ pub enum ActionType {
     Cancel,
 }
 
+impl ActionType {
+    pub fn to_direction(&self) -> Option<UiNavDirection> {
+        match self {
+            ActionType::Up => Some(UiNavDirection::Up),
+            ActionType::Down => Some(UiNavDirection::Down),
+            ActionType::Left => Some(UiNavDirection::Left),
+            ActionType::Right => Some(UiNavDirection::Right),
+            _ => None,
+        }
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GamepadStick {
@@ -38,12 +50,12 @@ pub enum InputMapping {
 
 #[derive(Debug, Resource)]
 pub struct UiNavInputManager {
-    input_map: Vec<InputMapping>,
-    current_state: HashMap<ActionType, bool>,
-    previous_state: HashMap<ActionType, bool>,
-    current_direction: Option<UiNavDirection>,
-    stick_tolerance: f32,
-    stick_snap_tolerance: f32,
+    pub(crate) input_map: Vec<InputMapping>,
+    pub(crate) current_state: HashMap<ActionType, bool>,
+    pub(crate) previous_state: HashMap<ActionType, bool>,
+    pub(crate) current_direction: Option<UiNavDirection>,
+    pub(crate) stick_tolerance: f32,
+    pub(crate) stick_snap_tolerance: f32,
 }
 
 impl UiNavInputManager {
@@ -142,7 +154,6 @@ fn get_gamepad_axes(
 
 pub fn update_input_manager(
     input: &mut UiNavInputManager,
-    keys: &ButtonInput<KeyCode>,
     gamepads: &Gamepads,
     gamepad_buttons: &ButtonInput<GamepadButton>,
     gamepad_axis: &Axis<GamepadAxis>,
@@ -156,11 +167,6 @@ pub fn update_input_manager(
     // update the current state
     for action in input.input_map.iter() {
         match action {
-            InputMapping::Key { keycode, action } => {
-                if keys.pressed(*keycode) {
-                    input.current_state.insert(*action, true);
-                }
-            }
             InputMapping::GamepadButton {
                 gamepad,
                 button,
@@ -222,6 +228,7 @@ pub fn update_input_manager(
                     input.current_state.insert(ActionType::Down, true);
                 }
             }
+            _ => (),
         }
     }
 

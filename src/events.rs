@@ -30,7 +30,7 @@ pub enum UiNavLockEvent {
 /// Event emitted when a focusable is clicked.
 ///
 /// This event is sent by this plugin and should be handled by the user.
-#[derive(Event)]
+#[derive(Event, Debug)]
 pub struct UiNavClickEvent(pub Entity);
 
 /// Event used internally to trigger a UI navigation request.
@@ -51,41 +51,6 @@ pub enum NavRequest {
     ActionRelease,
     /// Cancel key pressed for first time
     Cancel,
-}
-
-/// Event used internally to move focus in a specific direction.
-///
-/// This event is sent internally in response to a `NavRequest::Movement` event.
-#[derive(Event)]
-pub(crate) struct InternalFocusMoveEvent(pub UiNavDirection);
-
-/// Event used internally to handle action buttons being pressed/released.
-///
-/// This event is sent internally in response to a `NavRequest::ActionPress` or `NavRequest::ActionRelease` event.
-#[derive(Event, Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct InternalActionButtonEvent(pub PressType);
-
-/// Event used internally to refresh focusables in the current menu.
-///
-/// This event should be emitted when a new focusable is added, a focusable is enabled/disabled, a new menu is added
-/// or any other action that may result in no current focusable.
-#[derive(Event)]
-pub(crate) struct InternalRefreshEvent;
-
-/// Event used to set focus to a specific focusable entity.
-///
-/// This event is used internally, but can also be used if a user wishes to set focus to a specific `Focusable`.
-#[derive(Event)]
-pub(crate) struct InternalSetFocusEvent {
-    pub entity: Entity,
-    pub interaction_type: UiNavInteractionType,
-}
-
-impl InternalSetFocusEvent {
-    pub fn new_button(entity: Entity) -> Self {
-        Self {
-            entity,
-            interaction_type: UiNavInteractionType::Button,
-        }
-    }
+    /// Refresh focus state if menus have changed
+    Refresh,
 }
