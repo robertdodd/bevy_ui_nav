@@ -1,4 +1,4 @@
-use bevy::{app::AppExit, prelude::*, window::PresentMode};
+use bevy::{app::AppExit, prelude::*};
 use bevy_ui_nav::prelude::*;
 
 use example_utils::*;
@@ -7,17 +7,7 @@ mod example_utils;
 
 fn main() {
     App::new()
-        .add_plugins((
-            DefaultPlugins.set(WindowPlugin {
-                primary_window: Some(Window {
-                    present_mode: PresentMode::AutoNoVsync,
-                    ..default()
-                }),
-                ..default()
-            }),
-            BevyUiNavPlugin,
-            ExampleUtilsPlugin,
-        ))
+        .add_plugins((DefaultPlugins, BevyUiNavPlugin, ExampleUtilsPlugin))
         .add_systems(Startup, startup)
         .add_systems(
             Update,
