@@ -139,10 +139,10 @@ fn setup_new_focusables(
         // ensure the entity has a `RelativeCursorPosition` component
         let mut cmds = commands.entity(entity);
         if !has_interaction {
-            cmds.insert(Interaction::default());
+            cmds.try_insert(Interaction::default());
         }
         if !has_relative_cursor_position {
-            cmds.insert(RelativeCursorPosition::default());
+            cmds.try_insert(RelativeCursorPosition::default());
         }
 
         if focusable.menu.is_none() {
