@@ -178,6 +178,10 @@ impl UiSpatialMap {
         }
     }
 
+    pub fn menu(&self) -> Option<Entity> {
+        self.current_menu
+    }
+
     pub fn get_new_focusable(&self) -> Option<(Option<Entity>, UiNavInteractionType)> {
         if self.current_focusable != self._original_focusable {
             Some((
