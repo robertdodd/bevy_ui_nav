@@ -382,6 +382,7 @@ fn handle_nav_requests(
     let mut spatial_map =
         UiSpatialMap::from_query(&menu_query, &query.to_readonly(), nav_state.menu);
 
+    let mut is_cancel: bool = false;
     for event in events.read() {
         match event {
             NavRequest::SetFocus {
@@ -400,9 +401,7 @@ fn handle_nav_requests(
                 spatial_map.release();
             }
             NavRequest::Cancel => {
-                if let Some(Some(menu)) = spatial_map.get_new_menu() {
-                    cancel_writer.send(UiNavCancelEvent(menu));
-                }
+                is_cancel = true;
             }
             NavRequest::Refresh => (),
         }
@@ -457,6 +456,11 @@ fn handle_nav_requests(
                 }
             }
         }
+    }
+
+    // Handle cancel events
+    if let (true, Some(menu)) = (is_cancel, spatial_map.menu()) {
+        cancel_writer.send(UiNavCancelEvent(menu));
     }
 }
 
