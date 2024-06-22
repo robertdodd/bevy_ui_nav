@@ -455,7 +455,7 @@ fn handle_nav_requests(
     }
 
     // Handle cancel events
-    if let (true, Some(menu)) = (is_cancel, spatial_map.menu()) {
+    if let (false, true, Some(menu)) = (nav_state.locked, is_cancel, spatial_map.menu()) {
         cancel_writer.send(UiNavCancelEvent(menu));
     }
 }
