@@ -18,15 +18,6 @@ pub struct UiNavFocusChangedEvent {
 #[derive(Event, Debug)]
 pub struct UiNavCancelEvent(pub Entity);
 
-/// Event emitted to lock/unlock the nav request systems. Event handling will be blocked while locked.
-///
-/// This event should be emitted by the user when they wish to lock/un-lock navigation.
-#[derive(Event, PartialEq, Eq, Debug)]
-pub enum UiNavLockEvent {
-    Lock,
-    Unlock,
-}
-
 /// Event emitted when a focusable is clicked.
 ///
 /// This event is sent by this plugin and should be handled by the user.
@@ -53,4 +44,8 @@ pub enum NavRequest {
     Cancel,
     /// Refresh focus state if menus have changed
     Refresh,
+    /// Lock the nav request systems. Event handling will be blocked while locked. No effect if already locked.
+    Lock,
+    /// Unlock the nav request systems and enable event handling again. No effect if already unlocked.
+    Unlock,
 }

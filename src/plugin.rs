@@ -20,7 +20,6 @@ pub struct BevyUiNavPlugin;
 impl Plugin for BevyUiNavPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<UiNavClickEvent>()
-            .add_event::<UiNavLockEvent>()
             .add_event::<UiNavCancelEvent>()
             .add_event::<NavRequest>()
             .add_event::<UiNavFocusChangedEvent>()
@@ -53,11 +52,8 @@ impl Plugin for BevyUiNavPlugin {
                         handle_focusable_changed,
                     )
                         .before(UiNavSet),
-                    (
-                        handle_nav_requests.run_if(on_event::<NavRequest>()),
-                        handle_lock_events.run_if(on_event::<UiNavLockEvent>()),
-                    )
-                        .chain()
+                    handle_nav_requests
+                        .run_if(on_event::<NavRequest>())
                         .in_set(UiNavSet),
                 ),
             );
@@ -297,16 +293,6 @@ fn handle_current_menu_removed(
     nav_request_writer.send(NavRequest::Refresh);
 }
 
-/// System that reacts to `FocusLockEvent` events to lock or unlock navigation.
-fn handle_lock_events(mut events: EventReader<UiNavLockEvent>, mut nav_state: ResMut<UiNavState>) {
-    for event in events.read() {
-        match *event {
-            UiNavLockEvent::Lock => nav_state.locked = true,
-            UiNavLockEvent::Unlock => nav_state.locked = false,
-        }
-    }
-}
-
 /// System that listens for keyboard or gamepad input and emits the appropriate navigation events.
 #[allow(clippy::too_many_arguments)]
 fn handle_gamepad_input(
@@ -379,8 +365,7 @@ fn handle_nav_requests(
     mut click_writer: EventWriter<UiNavClickEvent>,
     mut focus_change_writer: EventWriter<UiNavFocusChangedEvent>,
 ) {
-    let mut spatial_map =
-        UiSpatialMap::from_query(&menu_query, &query.to_readonly(), nav_state.menu);
+    let mut spatial_map = UiSpatialMap::new(&menu_query, &query.to_readonly(), &nav_state);
 
     let mut is_cancel: bool = false;
     for event in events.read() {
@@ -402,6 +387,12 @@ fn handle_nav_requests(
             }
             NavRequest::Cancel => {
                 is_cancel = true;
+            }
+            NavRequest::Lock => {
+                spatial_map.lock();
+            }
+            NavRequest::Unlock => {
+                spatial_map.unlock();
             }
             NavRequest::Refresh => (),
         }
@@ -456,6 +447,11 @@ fn handle_nav_requests(
                 }
             }
         }
+    }
+
+    // Handle new locked state
+    if let Some(locked) = spatial_map.get_new_locked() {
+        nav_state.locked = locked
     }
 
     // Handle cancel events
