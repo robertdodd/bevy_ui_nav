@@ -14,8 +14,9 @@ fn main() {
             Update,
             (
                 text_control_style,
-                handle_button_click_events.run_if(on_event::<UiNavClickEvent>()),
-                handle_text_control_click_events.run_if(on_event::<UiNavClickEvent>()),
+                debug_cancel_events.run_if(on_event::<UiNavCancelEvent>()),
+                (handle_button_click_events, handle_text_control_click_events)
+                    .run_if(on_event::<UiNavClickEvent>()),
                 (
                     handle_keyboard_input_events.run_if(on_event::<KeyboardInput>()),
                     listen_received_character_events,
@@ -302,5 +303,12 @@ fn update_text_on_change(
                 text.sections[0].value = text_control.0.clone();
             }
         }
+    }
+}
+
+/// System that prints [`UiNavCancelEvent`] events to console.
+fn debug_cancel_events(mut events: EventReader<UiNavCancelEvent>) {
+    for event in events.read() {
+        println!("{event:?}");
     }
 }
