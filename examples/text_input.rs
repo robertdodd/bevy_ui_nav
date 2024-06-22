@@ -191,7 +191,7 @@ fn handle_button_click_events(
 fn handle_text_control_active_input(
     keys: Res<ButtonInput<KeyCode>>,
     mut query: Query<(&mut TextControlStatus, &mut TextControl)>,
-    mut lock_writer: EventWriter<UiNavLockEvent>,
+    mut nav_request_writer: EventWriter<NavRequest>,
     mut game_data: ResMut<GameData>,
 ) {
     for (mut status, mut text_control) in query.iter_mut() {
@@ -201,11 +201,11 @@ fn handle_text_control_active_input(
 
         if keys.just_pressed(KeyCode::Enter) {
             *status = TextControlStatus::InActive;
-            lock_writer.send(UiNavLockEvent::Unlock);
+            nav_request_writer.send(NavRequest::Unlock);
             game_data.name = text_control.0.clone();
         } else if keys.just_pressed(KeyCode::Escape) {
             *status = TextControlStatus::InActive;
-            lock_writer.send(UiNavLockEvent::Unlock);
+            nav_request_writer.send(NavRequest::Unlock);
             text_control.0 = game_data.name.clone();
         }
     }
@@ -240,18 +240,18 @@ fn handle_keyboard_input_events(
 fn handle_text_control_click_events(
     mut events: EventReader<UiNavClickEvent>,
     mut query: Query<&mut TextControlStatus>,
-    mut lock_writer: EventWriter<UiNavLockEvent>,
+    mut nav_request_writer: EventWriter<NavRequest>,
 ) {
     for event in events.read() {
         if let Ok(mut status) = query.get_mut(event.0) {
             match *status {
                 TextControlStatus::InActive => {
                     *status = TextControlStatus::Active;
-                    lock_writer.send(UiNavLockEvent::Lock);
+                    nav_request_writer.send(NavRequest::Lock);
                 }
                 TextControlStatus::Active => {
                     *status = TextControlStatus::InActive;
-                    lock_writer.send(UiNavLockEvent::Unlock);
+                    nav_request_writer.send(NavRequest::Unlock);
                 }
             }
         }

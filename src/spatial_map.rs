@@ -2,7 +2,7 @@ use bevy::{prelude::*, utils::HashMap};
 
 use crate::{
     focus_node::{FocusNode, FocusTarget},
-    prelude::{Focusable, NavMenu, UiNavDirection, UiNavInteractionType},
+    prelude::{Focusable, NavMenu, UiNavDirection, UiNavInteractionType, UiNavState},
     utils::f32_equal,
 };
 
@@ -33,13 +33,17 @@ pub struct UiSpatialMap {
     _original_focusable: Option<Entity>,
     _original_menu: Option<Entity>,
     _original_mouse_focusable: Option<Entity>,
+
+    // locked
+    locked: bool,
+    _original_locked: bool,
 }
 
 impl UiSpatialMap {
-    pub fn from_query(
+    pub fn new(
         menu_query: &Query<(Entity, &NavMenu)>,
         query: &Query<(Entity, &Focusable, &Node, &GlobalTransform)>,
-        current_menu: Option<Entity>,
+        nav_state: &UiNavState,
     ) -> Self {
         // Collect the normal focusables that are not disabled
         let mut current_mouse_focusable = None;
@@ -85,16 +89,21 @@ impl UiSpatialMap {
             current_focusable,
             current_interaction_type: None,
             is_current_pressed,
-            current_menu,
+            current_menu: nav_state.menu,
             _original_focusable: current_focusable,
-            _original_menu: current_menu,
+            _original_menu: nav_state.menu,
             _events: vec![],
             current_mouse_focusable,
             _original_mouse_focusable: current_mouse_focusable,
+            locked: nav_state.locked,
+            _original_locked: nav_state.locked,
         };
 
         // If there is no current focusable then attempt to find the next focusable
-        if ui_spatial_map.current_menu.is_some() && ui_spatial_map.current_focusable.is_none() {
+        if !ui_spatial_map.locked
+            && ui_spatial_map.current_menu.is_some()
+            && ui_spatial_map.current_focusable.is_none()
+        {
             ui_spatial_map.focus_on_node_in_current_menu();
         }
 
@@ -167,7 +176,7 @@ impl UiSpatialMap {
     }
 
     fn can_move(&self) -> bool {
-        self.current_focusable.is_some() && !self.is_current_pressed
+        !self.locked && self.current_focusable.is_some() && !self.is_current_pressed
     }
 
     pub fn get_new_menu(&self) -> Option<Option<Entity>> {
@@ -202,7 +211,18 @@ impl UiSpatialMap {
         }
     }
 
+    pub fn get_new_locked(&self) -> Option<bool> {
+        if self.locked != self._original_locked {
+            Some(self.locked)
+        } else {
+            None
+        }
+    }
+
     pub fn press(&mut self) -> Option<Entity> {
+        if self.locked {
+            return None;
+        }
         // ignore if we are currently pressing a button, or there is no current focusable
         if let (false, Some(current_focusable)) = (self.is_current_pressed, self.current_focusable)
         {
@@ -216,6 +236,9 @@ impl UiSpatialMap {
     }
 
     pub fn release(&mut self) -> Option<Entity> {
+        if self.locked {
+            return None;
+        }
         // ignore if we are currently pressing a button, or there is no current focusable
         if let (true, Some(current_focusable)) = (self.is_current_pressed, self.current_focusable) {
             self.is_current_pressed = false;
@@ -237,6 +260,16 @@ impl UiSpatialMap {
                 .push(UiSpatialMapEvent::Release(current_focusable));
             self.is_current_pressed = false;
         }
+    }
+
+    /// Lock UI navigation
+    pub fn lock(&mut self) {
+        self.locked = true;
+    }
+
+    /// Unlock UI navigation
+    pub fn unlock(&mut self) {
+        self.locked = false;
     }
 
     pub fn apply_movement(&mut self, direction: UiNavDirection) {
