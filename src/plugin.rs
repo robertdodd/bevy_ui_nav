@@ -353,10 +353,16 @@ fn handle_gamepad_input(
 #[allow(clippy::too_many_arguments)]
 fn handle_nav_requests(
     mut events: EventReader<NavRequest>,
+    mut query: Query<(
+        Entity,
+        &mut Focusable,
+        &Node,
+        &GlobalTransform,
+        &ViewVisibility,
+    )>,
     menu_query: Query<(Entity, &NavMenu)>,
     mut cancel_writer: EventWriter<UiNavCancelEvent>,
     mut nav_state: ResMut<UiNavState>,
-    mut query: Query<(Entity, &mut Focusable, &Node, &GlobalTransform)>,
     mut click_writer: EventWriter<UiNavClickEvent>,
     mut focus_change_writer: EventWriter<UiNavFocusChangedEvent>,
 ) {
@@ -396,12 +402,12 @@ fn handle_nav_requests(
     for event in spatial_map.events() {
         match event {
             UiSpatialMapEvent::Press(entity) => {
-                if let Ok((_, mut focusable, _, _)) = query.get_mut(*entity) {
+                if let Ok((_, mut focusable, _, _, _)) = query.get_mut(*entity) {
                     focusable.is_pressed_key = true;
                 }
             }
             UiSpatialMapEvent::Release(entity) => {
-                if let Ok((_, mut focusable, _, _)) = query.get_mut(*entity) {
+                if let Ok((_, mut focusable, _, _, _)) = query.get_mut(*entity) {
                     focusable.is_pressed_key = false;
                 }
             }
@@ -418,7 +424,7 @@ fn handle_nav_requests(
 
     // Focus on new focusable
     if let Some((new_focusable, interaction_type)) = spatial_map.get_new_focusable() {
-        for (entity, mut focusable, _, _) in query.iter_mut() {
+        for (entity, mut focusable, _, _, _) in query.iter_mut() {
             focusable.is_focused = Some(entity) == new_focusable;
             if focusable.is_focused {
                 focus_change_writer.send(UiNavFocusChangedEvent {
@@ -431,7 +437,7 @@ fn handle_nav_requests(
 
     // Focus on new mouse-only focusable
     if let Some(new_focusable) = spatial_map.get_new_mouse_only_focusable() {
-        for (entity, mut focusable, _, _) in query.iter_mut() {
+        for (entity, mut focusable, _, _, _) in query.iter_mut() {
             if focusable.is_mouse_only {
                 focusable.is_focused = Some(entity) == new_focusable;
                 if focusable.is_focused {
