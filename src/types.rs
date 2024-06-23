@@ -1,10 +1,13 @@
+use bevy::reflect::Reflect;
+
 /// Type describing whether an interaction can from a user or internally.
 ///
 /// - `UiNavInteractionType::Internal` means that the navigation event happened without user input, usually by this
 ///    plugin setting focus when a new focusable is spawned, but could also be in response to a menu being disabled or
 ///    enabled.
 /// - `UiNavInteractionType::User` means that the navigation event was the direfct result of user navigation input.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Reflect)]
+#[reflect(Debug, Hash, PartialEq)]
 pub enum UiNavInteractionType {
     /// The interaction was sent automatically from this plugin, most likely focusing on a newly added focusable.
     Auto,
@@ -17,14 +20,16 @@ pub enum UiNavInteractionType {
 }
 
 /// Type used to describe the state of a button, i.e. whether it is pressed or released.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
+#[reflect(Debug, Hash, PartialEq)]
 pub enum PressType {
     Release,
     Press,
 }
 
 /// Type which describes the focus state
-#[derive(Default, Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Hash, Debug, Reflect)]
+#[reflect(Debug, Hash, PartialEq)]
 pub enum FocusState {
     #[default]
     None, // not focused
@@ -40,7 +45,8 @@ impl FocusState {
 }
 
 /// Type describing a navigation direction.
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Reflect)]
+#[reflect(Debug, Hash, PartialEq)]
 pub enum UiNavDirection {
     Up,
     Down,

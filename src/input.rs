@@ -1,8 +1,12 @@
 use bevy::{prelude::*, utils::HashMap};
 
-use crate::prelude::{PressType, UiNavDirection};
+use crate::{
+    default_input_map::DEFAULT_INPUT_MAP,
+    prelude::{PressType, UiNavDirection},
+};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
+#[reflect(Debug, PartialEq, Hash)]
 pub enum ActionType {
     Up,
     Down,
@@ -25,13 +29,15 @@ impl ActionType {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
+#[reflect(Debug, PartialEq, Hash)]
 pub enum GamepadStick {
     Left,
     Right,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
+#[reflect(Debug, PartialEq, Hash)]
 pub enum InputMapping {
     Key {
         keycode: KeyCode,
@@ -48,7 +54,8 @@ pub enum InputMapping {
     },
 }
 
-#[derive(Debug, Resource)]
+#[derive(Debug, Resource, Reflect)]
+#[reflect(Resource, Debug)]
 pub struct UiNavInputManager {
     pub(crate) input_map: Vec<InputMapping>,
     pub(crate) current_state: HashMap<ActionType, bool>,
@@ -56,6 +63,12 @@ pub struct UiNavInputManager {
     pub(crate) current_direction: Option<UiNavDirection>,
     pub(crate) stick_tolerance: f32,
     pub(crate) stick_snap_tolerance: f32,
+}
+
+impl Default for UiNavInputManager {
+    fn default() -> Self {
+        Self::from_input_map(DEFAULT_INPUT_MAP, 0.1, 0.9)
+    }
 }
 
 impl UiNavInputManager {

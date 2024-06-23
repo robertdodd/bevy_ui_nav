@@ -3,7 +3,8 @@ use bevy::prelude::*;
 use crate::types::*;
 
 /// Component defining a menu that contains `Focusable` entities.
-#[derive(Component, Default, Debug, Clone)]
+#[derive(Component, Default, Debug, Clone, Reflect)]
+#[reflect(Component, Default, Debug)]
 pub struct NavMenu {
     /// Whether this menu should be made active when it is spawned. Changing this value after it is spawned will not
     /// have any effect.
@@ -31,7 +32,8 @@ impl NavMenu {
 }
 
 /// Component which marks a node as focusable.
-#[derive(Component, Default, Debug, Clone)]
+#[derive(Component, Default, Debug, Clone, Reflect)]
+#[reflect(Component, Default, Debug)]
 pub struct Focusable {
     /// The parent `NavMenu` entity this focusable belongs to
     pub(crate) menu: Option<Entity>,

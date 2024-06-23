@@ -6,7 +6,6 @@ use bevy::{
 
 use crate::{
     components::*,
-    default_input_map::DEFAULT_INPUT_MAP,
     events::*,
     input::*,
     resources::*,
@@ -25,11 +24,7 @@ impl Plugin for BevyUiNavPlugin {
             .add_event::<UiNavFocusChangedEvent>()
             .init_resource::<UiNavState>()
             .init_resource::<UiNavSettings>()
-            .insert_resource(UiNavInputManager::from_input_map(
-                DEFAULT_INPUT_MAP,
-                0.1,
-                0.9,
-            ))
+            .init_resource::<UiNavInputManager>()
             .add_systems(
                 Update,
                 (
