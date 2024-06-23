@@ -3,6 +3,10 @@
 use bevy::prelude::*;
 use bevy_ui_nav::prelude::*;
 
+mod class_builder;
+
+pub use class_builder::*;
+
 pub struct ExampleUtilsPlugin;
 
 impl Plugin for ExampleUtilsPlugin {
@@ -118,29 +122,45 @@ pub fn menu_button(
     mouse_only: bool,
     extras: impl Bundle,
 ) -> Entity {
-    parent
-        .spawn((
-            StyledButton,
+    menu_buttoni(
+        parent,
+        text,
+        (
             Focusable::default()
                 .with_priority(focus)
                 .with_disabled(disabled)
                 .with_mouse_only(mouse_only),
-            ButtonBundle {
-                style: Style {
-                    align_items: AlignItems::Center,
-                    justify_content: JustifyContent::Center,
-                    width: Val::Px(200.),
-                    height: Val::Px(50.),
-                    margin: UiRect::bottom(Val::Px(10.)),
-                    border: UiRect::all(Val::Px(1.)),
-                    ..default()
-                },
-                background_color: BUTTON_BG_DEFAULT.into(),
-                border_color: BUTTON_BG_DEFAULT.into(),
-                ..default()
-            },
             extras,
-        ))
+        ),
+        (),
+    )
+}
+
+/// Utility that spawns a button.
+pub fn menu_buttoni(
+    parent: &mut ChildBuilder,
+    text: impl Into<String>,
+    extras: impl Bundle,
+    class: impl ClassBuilder<ButtonBundle>,
+) -> Entity {
+    let mut bundle = ButtonBundle {
+        style: Style {
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            width: Val::Px(200.),
+            height: Val::Px(50.),
+            margin: UiRect::bottom(Val::Px(10.)),
+            border: UiRect::all(Val::Px(1.)),
+            ..default()
+        },
+        background_color: BUTTON_BG_DEFAULT.into(),
+        border_color: BUTTON_BG_DEFAULT.into(),
+        ..default()
+    };
+    class.apply(&mut bundle);
+
+    parent
+        .spawn((StyledButton, bundle, extras))
         .with_children(|p| {
             text_widget(p, FontSize::Small, text);
         })

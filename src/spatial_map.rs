@@ -42,7 +42,7 @@ pub struct UiSpatialMap {
 impl UiSpatialMap {
     pub fn new(
         menu_query: &Query<(Entity, &NavMenu)>,
-        query: &Query<(Entity, &Focusable, &Node, &GlobalTransform)>,
+        query: &Query<(Entity, &Focusable, &Node, &GlobalTransform, &ViewVisibility)>,
         nav_state: &UiNavState,
     ) -> Self {
         // Collect the normal focusables that are not disabled
@@ -54,8 +54,15 @@ impl UiSpatialMap {
         let mut mouse_only_focusables = HashMap::<Entity, FocusNode>::new();
         query
             .iter()
-            .filter(|(_, focusable, _, _)| !focusable.is_disabled)
-            .for_each(|(entity, focusable, node, global_transform)| {
+            // Ignore disables nodes, hidden nodes or nodes with 0 size along one dimension
+            .filter(|(_, focusable, node, _, visibility)| {
+                let size = node.size();
+                !focusable.is_disabled
+                    && visibility.get()
+                    && size.x > f32::EPSILON
+                    && size.y > f32::EPSILON
+            })
+            .for_each(|(entity, focusable, node, global_transform, _)| {
                 let focus_node = FocusNode {
                     menu: focusable.menu,
                     size: node.size(),
