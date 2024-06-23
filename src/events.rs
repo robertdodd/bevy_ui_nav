@@ -5,7 +5,8 @@ use crate::types::*;
 /// Event sent when a new focusable is focused.
 ///
 /// A user can use these events to react to UI Navigation events, for example to play a sound when focus changes.
-#[derive(Event, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Event, Debug, Clone, Copy, PartialEq, Eq, Reflect)]
+#[reflect(Debug, PartialEq)]
 pub struct UiNavFocusChangedEvent {
     pub entity: Entity,
     pub interaction_type: UiNavInteractionType,
@@ -15,19 +16,22 @@ pub struct UiNavFocusChangedEvent {
 ///
 /// This event is emitted by this plugin and should be handled by the user if they wish to handle cancel events in a
 /// menu.
-#[derive(Event, Debug)]
+#[derive(Event, Debug, Reflect, PartialEq, Hash)]
+#[reflect(Debug, PartialEq, Hash)]
 pub struct UiNavCancelEvent(pub Entity);
 
 /// Event emitted when a focusable is clicked.
 ///
 /// This event is sent by this plugin and should be handled by the user.
-#[derive(Event, Debug)]
+#[derive(Event, Debug, PartialEq, Reflect, Hash)]
+#[reflect(Debug, PartialEq, Hash)]
 pub struct UiNavClickEvent(pub Entity);
 
 /// Event used internally to trigger a UI navigation request.
 ///
 /// These events are emitted in response to keyboard or gamepad button input.
-#[derive(Event, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Event, Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
+#[reflect(Debug, PartialEq, Hash)]
 pub enum NavRequest {
     /// Set focus on a `Focusable`
     SetFocus {
