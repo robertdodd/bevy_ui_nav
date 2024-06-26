@@ -172,7 +172,7 @@ pub fn update_input_manager(
     gamepad_axis: &Axis<GamepadAxis>,
 ) {
     // update the previous state, and clear current state
-    input.previous_state = input.current_state.clone();
+    input.previous_state.clone_from(&input.current_state);
     for v in input.current_state.values_mut() {
         *v = false;
     }

@@ -203,11 +203,11 @@ fn handle_text_control_active_input(
         if keys.just_pressed(KeyCode::Enter) {
             *status = TextControlStatus::InActive;
             nav_request_writer.send(NavRequest::Unlock);
-            game_data.name = text_control.0.clone();
+            game_data.name.clone_from(&text_control.0);
         } else if keys.just_pressed(KeyCode::Escape) {
             *status = TextControlStatus::InActive;
             nav_request_writer.send(NavRequest::Unlock);
-            text_control.0 = game_data.name.clone();
+            text_control.0.clone_from(&game_data.name);
         }
     }
 }
@@ -229,7 +229,7 @@ fn handle_keyboard_input_events(
                 text_control.set_changed();
                 for &child in children.iter() {
                     if let Ok(mut text) = text_query.get_mut(child) {
-                        text.sections[0].value = text_control.0.clone();
+                        text.sections[0].value.clone_from(&text_control.0);
                     }
                 }
             }
@@ -262,7 +262,7 @@ fn handle_text_control_click_events(
 /// System that updates the label value when `GameData::name` changes
 fn update_title_label(game_data: Res<GameData>, mut query: Query<&mut Text, With<TitleLabel>>) {
     for mut text in query.iter_mut() {
-        text.sections[1].value = game_data.name.clone();
+        text.sections[1].value.clone_from(&game_data.name);
     }
 }
 
@@ -283,7 +283,7 @@ fn listen_received_character_events(
             // Update the text content instantly
             for &child in children.iter() {
                 if let Ok(mut text) = text_query.get_mut(child) {
-                    text.sections[0].value = text_control.0.clone();
+                    text.sections[0].value.clone_from(&text_control.0);
                 }
             }
         }
@@ -300,7 +300,7 @@ fn update_text_on_change(
     for (text_control, children) in query.iter() {
         for &child in children.iter() {
             if let Ok(mut text) = text_query.get_mut(child) {
-                text.sections[0].value = text_control.0.clone();
+                text.sections[0].value.clone_from(&text_control.0);
             }
         }
     }
