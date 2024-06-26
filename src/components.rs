@@ -54,6 +54,8 @@ pub struct Focusable {
     /// Whether the button can only be pressed via the mouse. If `true`, focusing on this button will not remove focus
     /// from other buttons.
     pub is_mouse_only: bool,
+    /// Whether the button is visible
+    pub is_visible: bool,
 }
 
 impl Focusable {

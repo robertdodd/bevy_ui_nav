@@ -44,6 +44,7 @@ impl Plugin for BevyUiNavPlugin {
                         )
                             .chain(),
                         tick_pressed_timer,
+                        update_focusable_visibility,
                         handle_focusable_changed,
                     )
                         .before(UiNavSet),
@@ -468,6 +469,27 @@ fn handle_focusable_changed(
 ) {
     if !query.is_empty() {
         nav_request_writer.send(NavRequest::Refresh);
+    }
+}
+
+/// System that updates [`Focusable`] components when their visibility changes. This will trigger a
+/// [`NavRequest::Refresh`] next frame, which will automatically set focus to a new focusable if needed.
+#[allow(clippy::type_complexity)]
+fn update_focusable_visibility(
+    mut query: Query<
+        (&mut Focusable, &Node, &ViewVisibility),
+        Or<(Changed<ViewVisibility>, Changed<Node>)>,
+    >,
+) {
+    // NOTE: We could send a [`NavRequest::Refresh`] event to refresh focus in the same frame, but because that will
+    // cause the refresh event to happen twice, and it is only a 1 frame delay that isn't in response to a user action,
+    // I decided not to do so.
+    for (mut focusable, node, visibility) in query.iter_mut() {
+        let size = node.size();
+        let is_visible = visibility.get() && size.x > f32::EPSILON && size.y > f32::EPSILON;
+        if is_visible != focusable.is_visible {
+            focusable.is_visible = is_visible;
+        }
     }
 }
 
