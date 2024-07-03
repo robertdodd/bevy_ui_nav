@@ -162,7 +162,7 @@ fn setup_new_focusables(
                 {
                     new_focus = Some(entity);
                 }
-            } else {
+            } else if !focusable.is_mouse_only {
                 warn!("A `Focusable` was added without a root `Menu` entity in it's heirarchy. This `Focusable` will not function.");
             }
         }
