@@ -217,7 +217,7 @@ fn handle_click_events(
             }
             ButtonAction::Debug(debug_text) => println!("clicked: {debug_text}"),
             ButtonAction::Quit => {
-                app_exit_writer.send(AppExit);
+                app_exit_writer.send(AppExit::Success);
             }
         };
     }

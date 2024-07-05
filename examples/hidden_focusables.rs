@@ -102,7 +102,7 @@ fn handle_click_events(
             println!("ClickEvent: {:?}", button_action);
             match *button_action {
                 ButtonAction::Quit => {
-                    app_exit_writer.send(AppExit);
+                    app_exit_writer.send(AppExit::Success);
                 }
                 ButtonAction::Ok => (),
                 ButtonAction::Panic => panic!("Button should not have been clicked!"),

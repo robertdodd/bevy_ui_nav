@@ -1,4 +1,12 @@
-use bevy::{app::AppExit, input::keyboard::KeyboardInput, prelude::*};
+use bevy::{
+    app::AppExit,
+    color::palettes::css,
+    input::{
+        keyboard::{Key, KeyboardInput},
+        ButtonState,
+    },
+    prelude::*,
+};
 use bevy_ui_nav::prelude::*;
 
 use example_utils::*;
@@ -17,12 +25,7 @@ fn main() {
                 debug_cancel_events.run_if(on_event::<UiNavCancelEvent>()),
                 (handle_button_click_events, handle_text_control_click_events)
                     .run_if(on_event::<UiNavClickEvent>()),
-                (
-                    handle_keyboard_input_events.run_if(on_event::<KeyboardInput>()),
-                    listen_received_character_events,
-                    handle_text_control_active_input,
-                )
-                    .chain(),
+                listen_received_character_events.run_if(on_event::<KeyboardInput>()),
                 update_text_on_change,
                 update_title_label.run_if(resource_changed::<GameData>),
             )
@@ -31,12 +34,12 @@ fn main() {
         .run();
 }
 
-const TEXT_CONTROL_BG_DEFAULT: Color = Color::DARK_GRAY;
-const TEXT_CONTROL_BG_ACTIVE: Color = Color::WHITE;
+const TEXT_CONTROL_BG_DEFAULT: Srgba = css::DARK_GRAY;
+const TEXT_CONTROL_BG_ACTIVE: Srgba = css::WHITE;
 
-const TEXT_CONTROL_BORDER_DEFAULT: Color = Color::WHITE;
-const TEXT_CONTROL_BORDER_ACTIVE: Color = Color::RED;
-const TEXT_CONTROL_BORDER_HOVER: Color = Color::YELLOW;
+const TEXT_CONTROL_BORDER_DEFAULT: Srgba = css::WHITE;
+const TEXT_CONTROL_BORDER_ACTIVE: Srgba = css::RED;
+const TEXT_CONTROL_BORDER_HOVER: Srgba = css::YELLOW;
 
 #[derive(Resource, Debug, Default)]
 struct GameData {
@@ -175,7 +178,7 @@ fn handle_button_click_events(
             println!("ClickEvent: {:?}", button_action);
             match *button_action {
                 ButtonAction::Quit => {
-                    app_exit_writer.send(AppExit);
+                    app_exit_writer.send(AppExit::Success);
                 }
                 ButtonAction::Reset => {
                     game_data.name = "".to_string();
@@ -184,55 +187,6 @@ fn handle_button_click_events(
                     }
                 }
             };
-        }
-    }
-}
-
-/// System that handles key presses while a text control has focus
-fn handle_text_control_active_input(
-    keys: Res<ButtonInput<KeyCode>>,
-    mut query: Query<(&mut TextControlStatus, &mut TextControl)>,
-    mut nav_request_writer: EventWriter<NavRequest>,
-    mut game_data: ResMut<GameData>,
-) {
-    for (mut status, mut text_control) in query.iter_mut() {
-        if *status == TextControlStatus::InActive {
-            continue;
-        }
-
-        if keys.just_pressed(KeyCode::Enter) {
-            *status = TextControlStatus::InActive;
-            nav_request_writer.send(NavRequest::Unlock);
-            game_data.name.clone_from(&text_control.0);
-        } else if keys.just_pressed(KeyCode::Escape) {
-            *status = TextControlStatus::InActive;
-            nav_request_writer.send(NavRequest::Unlock);
-            text_control.0.clone_from(&game_data.name);
-        }
-    }
-}
-
-/// System that handles key presses while a text control has focus
-fn handle_keyboard_input_events(
-    mut events: EventReader<KeyboardInput>,
-    mut query: Query<(&TextControlStatus, &mut TextControl, &Children)>,
-    mut text_query: Query<&mut Text>,
-) {
-    for event in events.read() {
-        for (status, mut text_control, children) in query.iter_mut() {
-            if *status == TextControlStatus::InActive {
-                continue;
-            }
-
-            if let KeyCode::Backspace = event.key_code {
-                text_control.0.pop();
-                text_control.set_changed();
-                for &child in children.iter() {
-                    if let Ok(mut text) = text_query.get_mut(child) {
-                        text.sections[0].value.clone_from(&text_control.0);
-                    }
-                }
-            }
         }
     }
 }
@@ -268,22 +222,55 @@ fn update_title_label(game_data: Res<GameData>, mut query: Query<&mut Text, With
 
 /// System that listens for characer key presses in the text control
 fn listen_received_character_events(
-    mut events: EventReader<ReceivedCharacter>,
-    mut query: Query<(&mut TextControl, &TextControlStatus, &Children)>,
+    mut events: EventReader<KeyboardInput>,
+    mut query: Query<(&mut TextControl, &mut TextControlStatus, &Children)>,
     mut text_query: Query<&mut Text>,
+    mut nav_request_writer: EventWriter<NavRequest>,
+    mut game_data: ResMut<GameData>,
 ) {
-    for event in events.read().filter(|event| event.char != "\r") {
-        for (mut text_control, status, children) in query.iter_mut() {
-            if *status != TextControlStatus::Active {
-                continue;
-            }
+    for event in events.read() {
+        if event.state == ButtonState::Pressed {
+            for (mut text_control, mut status, children) in query.iter_mut() {
+                if *status != TextControlStatus::Active {
+                    continue;
+                }
 
-            text_control.0.push_str(&event.char);
+                // track whether we handled the key press
+                let is_changed = match &event.logical_key {
+                    Key::Character(char) => {
+                        text_control.0.push_str(char);
+                        true
+                    }
+                    Key::Backspace => {
+                        text_control.0.pop();
+                        true
+                    }
+                    Key::Enter => {
+                        *status = TextControlStatus::InActive;
+                        nav_request_writer.send(NavRequest::Unlock);
+                        game_data.name.clone_from(&text_control.0);
+                        true
+                    }
+                    Key::Space => {
+                        text_control.0.push(' ');
+                        true
+                    }
+                    Key::Escape => {
+                        *status = TextControlStatus::InActive;
+                        nav_request_writer.send(NavRequest::Unlock);
+                        text_control.0.clone_from(&game_data.name);
+                        true
+                    }
+                    _ => false,
+                };
 
-            // Update the text content instantly
-            for &child in children.iter() {
-                if let Ok(mut text) = text_query.get_mut(child) {
-                    text.sections[0].value.clone_from(&text_control.0);
+                // Update the text content instantly
+                if is_changed {
+                    for &child in children.iter() {
+                        if let Ok(mut text) = text_query.get_mut(child) {
+                            text.sections[0].value.clone_from(&text_control.0);
+                        }
+                    }
                 }
             }
         }

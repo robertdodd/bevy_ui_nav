@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use bevy::prelude::*;
+use bevy::{color::palettes::css, prelude::*};
 use bevy_ui_nav::prelude::*;
 
 mod class_builder;
@@ -15,10 +15,10 @@ impl Plugin for ExampleUtilsPlugin {
     }
 }
 
-pub const BUTTON_BG_DEFAULT: Color = Color::DARK_GRAY;
-pub const BUTTON_BG_ACTIVE: Color = Color::GRAY;
-pub const BUTTON_BG_PRESS: Color = Color::BLACK;
-pub const BUTTON_BG_DISABLED: Color = Color::BEIGE;
+pub const BUTTON_BG_DEFAULT: Srgba = css::DARK_GRAY;
+pub const BUTTON_BG_ACTIVE: Srgba = css::GRAY;
+pub const BUTTON_BG_PRESS: Srgba = css::BLACK;
+pub const BUTTON_BG_DISABLED: Srgba = css::BEIGE;
 
 pub const FONT_SIZE_SM: f32 = 20.;
 pub const FONT_SIZE_LG: f32 = 40.;
@@ -192,10 +192,9 @@ fn button_style(
 
         // border color
         *border = if focusable.is_hovered() {
-            Color::WHITE
+            Color::WHITE.into()
         } else {
-            BUTTON_BG_DEFAULT
-        }
-        .into();
+            BUTTON_BG_DEFAULT.into()
+        };
     }
 }
