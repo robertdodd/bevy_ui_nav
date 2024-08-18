@@ -34,7 +34,7 @@ struct ButtonWrapper;
 fn startup(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 
-    root_full_screen_centered(&mut commands, |p| {
+    root_full_screen_centered(&mut commands, (), |p| {
         spawn_menu(true, false, p, (), |p| {
             text_widget(p, FontSize::Small, "Press <TAB> to reveal focusables");
             button_wrapper_widget(p, |p| {

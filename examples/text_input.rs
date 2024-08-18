@@ -114,7 +114,7 @@ fn spawn_text_control(
 fn startup(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 
-    root_full_screen_centered(&mut commands, |p| {
+    root_full_screen_centered(&mut commands, (), |p| {
         spawn_menu(true, false, p, (), |p| {
             // title
             p.spawn((

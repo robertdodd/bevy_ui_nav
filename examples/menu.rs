@@ -29,7 +29,7 @@ enum ButtonAction {
 fn startup(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 
-    root_full_screen_centered(&mut commands, |p| {
+    root_full_screen_centered(&mut commands, (), |p| {
         // spawn a menu
         spawn_menu(true, false, p, (), |p| {
             menu_button(p, "Option 1", true, false, false, ButtonAction::Option1);
