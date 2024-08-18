@@ -106,6 +106,24 @@ impl UiSpatialMap {
             _original_locked: nav_state.locked,
         };
 
+        // If there is no current menu then attempt to set the next menu
+        if !ui_spatial_map.locked && ui_spatial_map.current_menu.is_none() {
+            if let Some((menu_entity, _)) = ui_spatial_map
+                .menus
+                .iter()
+                .filter(|(_, menu)| !menu.is_locked)
+                .reduce(|acc, e| {
+                    if e.1.is_priority && !acc.1.is_priority {
+                        e
+                    } else {
+                        acc
+                    }
+                })
+            {
+                ui_spatial_map.set_focus_to_menu(Some(*menu_entity));
+            }
+        }
+
         // If there is no current focusable then attempt to find the next focusable
         if !ui_spatial_map.locked
             && ui_spatial_map.current_menu.is_some()
