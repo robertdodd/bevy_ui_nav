@@ -18,7 +18,7 @@ fn startup(mut commands: Commands) {
     let n_columns = 4;
 
     // Spawn multiple buttons in a grid, with no spacing between them, to check that navigation works correctly.
-    root_full_screen_centered(&mut commands, |p| {
+    root_full_screen_centered(&mut commands, (), |p| {
         spawn_menu(true, false, p, (), |p| {
             button_grid(p, n_columns, |p| {
                 for i in 0..(n_columns * n_columns) {

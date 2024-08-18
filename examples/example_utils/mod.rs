@@ -43,20 +43,24 @@ impl From<FontSize> for f32 {
 /// Utility that spawns a root node covering the entire screen, with content aligned to the center.
 pub fn root_full_screen_centered(
     commands: &mut Commands,
+    extras: impl Bundle,
     children: impl FnOnce(&mut ChildBuilder),
 ) {
     commands
-        .spawn(NodeBundle {
-            style: Style {
-                width: Val::Percent(100.),
-                height: Val::Percent(100.),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
+        .spawn((
+            NodeBundle {
+                style: Style {
+                    width: Val::Percent(100.),
+                    height: Val::Percent(100.),
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::Center,
+                    ..default()
+                },
                 ..default()
             },
-            ..default()
-        })
+            extras,
+        ))
         .with_children(children);
 }
 
