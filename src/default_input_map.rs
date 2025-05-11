@@ -33,32 +33,32 @@ pub(crate) const DEFAULT_INPUT_MAP: &[InputMapping] = &[
     },
     InputMapping::GamepadButton {
         gamepad: None,
-        button: GamepadButtonType::DPadUp,
+        button: GamepadButton::DPadUp,
         action: ActionType::Up,
     },
     InputMapping::GamepadButton {
         gamepad: None,
-        button: GamepadButtonType::DPadDown,
+        button: GamepadButton::DPadDown,
         action: ActionType::Down,
     },
     InputMapping::GamepadButton {
         gamepad: None,
-        button: GamepadButtonType::DPadLeft,
+        button: GamepadButton::DPadLeft,
         action: ActionType::Left,
     },
     InputMapping::GamepadButton {
         gamepad: None,
-        button: GamepadButtonType::DPadRight,
+        button: GamepadButton::DPadRight,
         action: ActionType::Right,
     },
     InputMapping::GamepadButton {
         gamepad: None,
-        button: GamepadButtonType::South,
+        button: GamepadButton::South,
         action: ActionType::Action,
     },
     InputMapping::GamepadButton {
         gamepad: None,
-        button: GamepadButtonType::East,
+        button: GamepadButton::East,
         action: ActionType::Cancel,
     },
     InputMapping::GamepadAxes {
