@@ -1,11 +1,6 @@
 use bevy::reflect::Reflect;
 
 /// Type describing whether an interaction can from a user or internally.
-///
-/// - `UiNavInteractionType::Internal` means that the navigation event happened without user input, usually by this
-///    plugin setting focus when a new focusable is spawned, but could also be in response to a menu being disabled or
-///    enabled.
-/// - `UiNavInteractionType::User` means that the navigation event was the direfct result of user navigation input.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Reflect)]
 #[reflect(Debug, Hash, PartialEq)]
 pub enum UiNavInteractionType {

@@ -5,31 +5,19 @@ consolidates click event handling from key presses and mouse button clicks (usin
 
 ---
 
-## TODO
-
-- Update text input example
-- Focus change events should say whether moved by mouse or button.
-- Remove/fix debug logging and println statements
-- add directional press events, e.g. a focusable that increments/decrements when you press left/right, instead of
-  navigating
-- allow pressing DOWN (hold) then LEFT. This should be treated as 2 key presses, even though directions are pressed the
-  entire time. The second keypress should register instantly. This should not happen when using the gamepad stick.
 
 ## Features
 
-- No external dependencies, only `bevy`.
-- Supports click events on mouse button release
-- Automatically handle movement when holding a directional key. Increase speed the longer it's held. Customizable.
-- Customize movement speed
-- Menu wrapping
+- No external dependencies besides `bevy`.
+- Click events triggered on mouse button release.
 
 ## Differences from `bevy-ui-navigation`
 
 The key difference from [bevy-ui-navigation](https://github.com/nicopap/ui-navigation) are:
 
 - No automatic sub-menu navigation. You need to manually send a `NavRequest::SetFocus` event to change focus to a menu.
-- No external dependencies (`bevy-ui-navigation` depends on `bevy_mod_picking`). `bevy_ui_nav` uses the following core
-  `bevy` types for handling mouse interactions: `Interaction` and `RelativeCursorPosition`
+- No external dependencies (`bevy-ui-navigation` depends on `bevy_mod_picking`). `bevy_ui_nav` uses `Interaction` and
+    `RelativeCursorPosition` for mouse events.
 - Automatically handles movement when holding a directional key.
 
 ## Usage
@@ -99,10 +87,6 @@ fn handle_click_events(
     query: Query<&ButtonAction>,
     mut app_exit_writer: EventWriter<AppExit>,
 ) {
-    // NOTE: This is equivalent to the following:
-    // for event in events.read() {
-    //     if let Ok(button_action) = query.get(event.0) {...}
-    // }
     for event in events.nav_iter().activated_in_query(&query) {
         match *button_action {
             ButtonAction::Quit => app_exit_writer.send(AppExit),
@@ -112,18 +96,24 @@ fn handle_click_events(
 }
 ```
 
+**Note:** `events.nav_iter().activated_in_query(&query)` is equivalent to the following:
+
+```rust
+for event in events.read() {
+    if let Ok(button_action) = query.get(event.0) {
+        todo!();
+    }
+}
+```
+
 Handle cancel events:
 
 ```rust
-fn handle_click_events(
-    mut events: EventReader<FocusableClickEvent>,
+fn handle_cancel_events(
+    mut events: EventReader<UiNavCancelEvent>,
     query: Query<(), With<MyMenu>>,
     mut app_exit_writer: EventWriter<AppExit>,
 ) {
-    // NOTE: This is equivalent to the following:
-    // for event in events.read() {
-    //     if query.contains(event.0) {...}
-    // }
     for _ in events.nav_iter().activated_in_query(&query) {
         app_exit_writer.send(AppExit);
     }
@@ -207,11 +197,18 @@ Play sounds when navigating between focusables:
 ```rust
 fn handle_focus_change_events(mut events: EventReader<UiNavFocusChangedEvent>) {
     for event in events.read() {
-        println!("{event:?}");
         // TODO: Spawn appropriate sound effect
+        todo!();
     }
 }
 ```
+
+## Compatible Bevy versions
+
+| `bevy_ui_nav`   | `bevy` |
+|:----------------|:-------|
+| `0.2`           | `0.16` |
+| `0.1`           | `0.13` |
 
 # Credits
 

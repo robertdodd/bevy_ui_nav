@@ -37,7 +37,7 @@ impl<'w, 's, T: Event + UiNavEvent> UiNavEventReaderExt<'w, 's, T> for EventRead
 pub struct UiNavEventReader<'w, 's, 'a, T: Event + UiNavEvent> {
     event_reader: &'a mut EventReader<'w, 's, T>,
 }
-impl<'w, 's, 'a, T: Event + UiNavEvent> UiNavEventReader<'w, 's, 'a, T> {
+impl<T: Event + UiNavEvent> UiNavEventReader<'_, '_, '_, T> {
     /// Iterate over query items pointed to by the events.
     pub fn in_query<'b, 'c: 'b, Q: ReadOnlyQueryData, F: QueryFilter>(
         &'b mut self,

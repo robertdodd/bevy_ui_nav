@@ -14,9 +14,9 @@ fn main() {
             (
                 handle_loading,
                 (
-                    handle_click_events.run_if(on_event::<UiNavClickEvent>()),
-                    handle_cancel_events.run_if(on_event::<UiNavCancelEvent>()),
-                    handle_nav_events.run_if(on_event::<UiNavFocusChangedEvent>()),
+                    handle_click_events.run_if(on_event::<UiNavClickEvent>),
+                    handle_cancel_events.run_if(on_event::<UiNavCancelEvent>),
+                    handle_nav_events.run_if(on_event::<UiNavFocusChangedEvent>),
                 )
                     .after(UiNavSet),
             ),
@@ -38,12 +38,12 @@ enum ButtonAction {
 }
 
 fn startup(mut commands: Commands) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d);
 
     commands.insert_resource(LoadingTimer(Timer::from_seconds(2., TimerMode::Once)));
 
     root_full_screen_centered(&mut commands, (), |p| {
-        spawn_menu(true, false, p, MainMenu, |p| {
+        spawn_menu(true, false, p, MainMenu).with_children(|p| {
             menu_button(p, "Option 1", true, true, false, ButtonAction::Option1);
             menu_button(p, "Option 2", false, true, false, ButtonAction::Option2);
             menu_button(p, "Quit", false, true, false, ButtonAction::Quit);
@@ -82,7 +82,7 @@ fn handle_click_events(
         println!("ClickEvent: {:?}", button_action);
         match *button_action {
             ButtonAction::Quit => {
-                app_exit_writer.send(AppExit::Success);
+                app_exit_writer.write(AppExit::Success);
             }
             ButtonAction::Option1 => (),
             ButtonAction::Option2 => (),

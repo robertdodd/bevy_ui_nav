@@ -12,19 +12,13 @@ fn main() {
         .add_systems(
             Update,
             (
-                handle_scroll,
-                (
-                    handle_click_events.run_if(on_event::<UiNavClickEvent>()),
-                    handle_cancel_events.run_if(on_event::<UiNavCancelEvent>()),
-                )
-                    .after(UiNavSet),
-            ),
+                handle_click_events.run_if(on_event::<UiNavClickEvent>),
+                handle_cancel_events.run_if(on_event::<UiNavCancelEvent>),
+            )
+                .after(UiNavSet),
         )
         .run();
 }
-
-#[derive(Component)]
-struct MenuScroll;
 
 #[derive(Component)]
 struct MainMenu;
@@ -38,20 +32,17 @@ enum ButtonAction {
 }
 
 fn startup(mut commands: Commands) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d);
 
     root_full_screen_centered(&mut commands, (), |p| {
-        spawn_menu(true, false, p, MainMenu, |p| {
+        spawn_menu(true, false, p, MainMenu).with_children(|p| {
             menu_button(p, "Option 1", true, false, false, ButtonAction::Option1);
             menu_button(p, "Disabled", false, true, false, ButtonAction::Option2);
             menu_button(p, "Option 2", false, false, false, ButtonAction::Option2);
-            p.spawn(NodeBundle {
-                style: Style {
-                    flex_direction: FlexDirection::Row,
-                    width: Val::Px(500.),
-                    justify_content: JustifyContent::SpaceBetween,
-                    ..default()
-                },
+            p.spawn(Node {
+                flex_direction: FlexDirection::Row,
+                width: Val::Px(500.),
+                justify_content: JustifyContent::SpaceBetween,
                 ..default()
             })
             .with_children(|p| {
@@ -60,21 +51,6 @@ fn startup(mut commands: Commands) {
             });
         });
     });
-}
-
-fn handle_scroll(keys: Res<ButtonInput<KeyCode>>, mut query: Query<&mut Style, With<MenuScroll>>) {
-    let direction = if keys.just_pressed(KeyCode::KeyW) {
-        Some(-1.)
-    } else if keys.just_pressed(KeyCode::KeyS) {
-        Some(1.)
-    } else {
-        None
-    };
-    if let Some(direction) = direction {
-        let mut style = query.single_mut();
-        let current = if let Val::Px(v) = style.top { v } else { 0. };
-        style.top = Val::Px(current + direction * 10.);
-    }
 }
 
 fn handle_click_events(
@@ -94,7 +70,7 @@ fn handle_click_events(
         println!("ClickEvent: {:?}", button_action);
         match *button_action {
             ButtonAction::Quit => {
-                app_exit_writer.send(AppExit::Success);
+                app_exit_writer.write(AppExit::Success);
             }
             ButtonAction::Save => (),
             _ => (),

@@ -1,6 +1,7 @@
 use bevy::{
     app::AppExit,
     color::palettes::css,
+    ecs::relationship::RelatedSpawnerCommands,
     input::{
         keyboard::{Key, KeyboardInput},
         ButtonState,
@@ -22,10 +23,10 @@ fn main() {
             Update,
             (
                 text_control_style,
-                debug_cancel_events.run_if(on_event::<UiNavCancelEvent>()),
+                debug_cancel_events.run_if(on_event::<UiNavCancelEvent>),
                 (handle_button_click_events, handle_text_control_click_events)
-                    .run_if(on_event::<UiNavClickEvent>()),
-                listen_received_character_events.run_if(on_event::<KeyboardInput>()),
+                    .run_if(on_event::<UiNavClickEvent>),
+                listen_received_character_events.run_if(on_event::<KeyboardInput>),
                 update_text_on_change,
                 update_title_label.run_if(resource_changed::<GameData>),
             )
@@ -67,7 +68,7 @@ enum ButtonAction {
 
 /// Utility that spawns a text control.
 fn spawn_text_control(
-    parent: &mut ChildBuilder,
+    parent: &mut RelatedSpawnerCommands<ChildOf>,
     text: impl Into<String>,
     focus: bool,
     extras: impl Bundle,
@@ -79,48 +80,41 @@ fn spawn_text_control(
             } else {
                 Focusable::default()
             },
-            NodeBundle {
-                style: Style {
-                    align_items: AlignItems::Center,
-                    justify_content: JustifyContent::Center,
-                    width: Val::Px(200.),
-                    height: Val::Px(50.),
-                    margin: UiRect::bottom(Val::Px(10.)),
-                    border: UiRect::all(Val::Px(1.)),
-                    ..default()
-                },
-                background_color: TEXT_CONTROL_BG_DEFAULT.into(),
-                border_color: TEXT_CONTROL_BORDER_DEFAULT.into(),
+            Node {
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                width: Val::Px(200.),
+                height: Val::Px(50.),
+                margin: UiRect::bottom(Val::Px(10.)),
+                border: UiRect::all(Val::Px(1.)),
                 ..default()
             },
+            BackgroundColor(TEXT_CONTROL_BG_DEFAULT.into()),
+            BorderColor(TEXT_CONTROL_BORDER_DEFAULT.into()),
             Interaction::default(),
             TextControl::default(),
             TextControlStatus::InActive,
             extras,
         ))
         .with_children(|p| {
-            p.spawn(TextBundle::from_section(
-                text,
-                TextStyle {
-                    color: Color::BLACK,
-                    font_size: 20.,
-                    ..default()
-                },
+            p.spawn((
+                Text::new(text),
+                TextColor(Color::BLACK),
+                TextFont::from_font_size(20.),
             ));
         })
         .id()
 }
 
 fn startup(mut commands: Commands) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d);
 
     root_full_screen_centered(&mut commands, (), |p| {
-        spawn_menu(true, false, p, (), |p| {
+        spawn_menu(true, false, p, ()).with_children(|p| {
             // title
-            p.spawn((
-                TextBundle::from_sections(["Name: ".into(), "".into()]),
-                TitleLabel,
-            ));
+            p.spawn(Text::new("Name: ")).with_children(|p| {
+                p.spawn((TitleLabel, TextSpan::new("")));
+            });
 
             // text control
             spawn_text_control(p, "", true, ());
@@ -178,7 +172,7 @@ fn handle_button_click_events(
             println!("ClickEvent: {:?}", button_action);
             match *button_action {
                 ButtonAction::Quit => {
-                    app_exit_writer.send(AppExit::Success);
+                    app_exit_writer.write(AppExit::Success);
                 }
                 ButtonAction::Reset => {
                     game_data.name = "".to_string();
@@ -202,11 +196,11 @@ fn handle_text_control_click_events(
             match *status {
                 TextControlStatus::InActive => {
                     *status = TextControlStatus::Active;
-                    nav_request_writer.send(NavRequest::Lock);
+                    nav_request_writer.write(NavRequest::Lock);
                 }
                 TextControlStatus::Active => {
                     *status = TextControlStatus::InActive;
-                    nav_request_writer.send(NavRequest::Unlock);
+                    nav_request_writer.write(NavRequest::Unlock);
                 }
             }
         }
@@ -214,9 +208,9 @@ fn handle_text_control_click_events(
 }
 
 /// System that updates the label value when `GameData::name` changes
-fn update_title_label(game_data: Res<GameData>, mut query: Query<&mut Text, With<TitleLabel>>) {
+fn update_title_label(game_data: Res<GameData>, mut query: Query<&mut TextSpan, With<TitleLabel>>) {
     for mut text in query.iter_mut() {
-        text.sections[1].value.clone_from(&game_data.name);
+        text.0.clone_from(&game_data.name);
     }
 }
 
@@ -247,7 +241,7 @@ fn listen_received_character_events(
                     }
                     Key::Enter => {
                         *status = TextControlStatus::InActive;
-                        nav_request_writer.send(NavRequest::Unlock);
+                        nav_request_writer.write(NavRequest::Unlock);
                         game_data.name.clone_from(&text_control.0);
                         true
                     }
@@ -257,7 +251,7 @@ fn listen_received_character_events(
                     }
                     Key::Escape => {
                         *status = TextControlStatus::InActive;
-                        nav_request_writer.send(NavRequest::Unlock);
+                        nav_request_writer.write(NavRequest::Unlock);
                         text_control.0.clone_from(&game_data.name);
                         true
                     }
@@ -266,9 +260,9 @@ fn listen_received_character_events(
 
                 // Update the text content instantly
                 if is_changed {
-                    for &child in children.iter() {
+                    for child in children.iter() {
                         if let Ok(mut text) = text_query.get_mut(child) {
-                            text.sections[0].value.clone_from(&text_control.0);
+                            text.0.clone_from(&text_control.0);
                         }
                     }
                 }
@@ -285,9 +279,9 @@ fn update_text_on_change(
     mut text_query: Query<&mut Text>,
 ) {
     for (text_control, children) in query.iter() {
-        for &child in children.iter() {
+        for child in children.iter() {
             if let Ok(mut text) = text_query.get_mut(child) {
-                text.sections[0].value.clone_from(&text_control.0);
+                text.0.clone_from(&text_control.0);
             }
         }
     }

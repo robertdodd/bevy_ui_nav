@@ -1,4 +1,4 @@
-use bevy::{prelude::*, utils::HashMap};
+use bevy::{platform::collections::HashMap, prelude::*};
 
 use crate::{
     default_input_map::DEFAULT_INPUT_MAP,
@@ -44,12 +44,12 @@ pub enum InputMapping {
         action: ActionType,
     },
     GamepadButton {
-        gamepad: Option<Gamepad>,
-        button: GamepadButtonType,
+        gamepad: Option<Entity>,
+        button: GamepadButton,
         action: ActionType,
     },
     GamepadAxes {
-        gamepad: Option<Gamepad>,
+        gamepad: Option<Entity>,
         stick: GamepadStick,
     },
 }
@@ -120,33 +120,21 @@ impl UiNavInputManager {
 }
 
 fn get_gamepad_axes(
-    gamepad: Gamepad,
-    gamepad_axis: &Axis<GamepadAxis>,
+    gamepad: &Gamepad,
     stick: GamepadStick,
     stick_tolerance: f32,
     stick_snap_tolerance: f32,
 ) -> Vec2 {
-    let x_axis_type = match stick {
-        GamepadStick::Left => GamepadAxisType::LeftStickX,
-        GamepadStick::Right => GamepadAxisType::RightStickX,
+    let axes = match stick {
+        GamepadStick::Left => gamepad.left_stick(),
+        GamepadStick::Right => gamepad.right_stick(),
     };
-    let x = gamepad_axis
-        .get(GamepadAxis::new(gamepad, x_axis_type))
-        .unwrap();
 
-    let y_axis_type = match stick {
-        GamepadStick::Left => GamepadAxisType::LeftStickY,
-        GamepadStick::Right => GamepadAxisType::RightStickY,
-    };
-    let y = gamepad_axis
-        .get(GamepadAxis::new(gamepad, y_axis_type))
-        .unwrap();
-
-    let abs_x = x.abs();
-    let abs_y = y.abs();
+    let abs_x = axes.x.abs();
+    let abs_y = axes.y.abs();
     let mut result = Vec2::new(
-        if abs_x > stick_tolerance { x } else { 0. },
-        if abs_y > stick_tolerance { y } else { 0. },
+        if abs_x > stick_tolerance { axes.x } else { 0. },
+        if abs_y > stick_tolerance { axes.y } else { 0. },
     );
 
     // Clear small values when moving diagonlly. For example, the user may think they are pressing to the left, but
@@ -167,9 +155,9 @@ fn get_gamepad_axes(
 
 pub fn update_input_manager(
     input: &mut UiNavInputManager,
-    gamepads: &Gamepads,
-    gamepad_buttons: &ButtonInput<GamepadButton>,
-    gamepad_axis: &Axis<GamepadAxis>,
+    gamepads: &Query<(Entity, &Gamepad)>,
+    // gamepad_buttons: &ButtonInput<GamepadButton>,
+    // gamepad_axis: &Axis<GamepadAxis>,
 ) {
     // update the previous state, and clear current state
     input.previous_state.clone_from(&input.current_state);
@@ -185,50 +173,36 @@ pub fn update_input_manager(
                 button,
                 action,
             } => {
-                let is_pressed = if let Some(gamepad) = gamepad {
-                    let gamepad_button = GamepadButton::new(*gamepad, *button);
-                    gamepad_buttons.pressed(gamepad_button)
-                } else {
-                    gamepads.iter().any(|gamepad| {
-                        let gamepad_button = GamepadButton::new(gamepad, *button);
-                        gamepad_buttons.pressed(gamepad_button)
-                    })
-                };
+                let is_pressed = gamepads
+                    .iter()
+                    .filter(|(e, _)| gamepad.is_none() || Some(*e) == *gamepad)
+                    .any(|(_, g)| g.pressed(*button));
+
                 if is_pressed {
                     input.current_state.insert(*action, is_pressed);
                 }
             }
             InputMapping::GamepadAxes { gamepad, stick } => {
-                let axes = if let Some(gamepad) = gamepad {
-                    get_gamepad_axes(
-                        *gamepad,
-                        gamepad_axis,
-                        *stick,
-                        input.stick_tolerance,
-                        input.stick_snap_tolerance,
-                    )
-                } else {
-                    gamepads
-                        .iter()
-                        .map(|gamepad| {
-                            get_gamepad_axes(
-                                gamepad,
-                                gamepad_axis,
-                                *stick,
-                                input.stick_tolerance,
-                                input.stick_snap_tolerance,
-                            )
-                        })
-                        .fold(Vec2::ZERO, |acc, e| {
-                            let acc_dist = acc.length();
-                            let e_dist = e.length();
-                            if e_dist > acc_dist {
-                                e
-                            } else {
-                                acc
-                            }
-                        })
-                };
+                let axes = gamepads
+                    .iter()
+                    .filter(|(e, _)| gamepad.is_none() || Some(*e) == *gamepad)
+                    .map(|(_, g)| {
+                        get_gamepad_axes(
+                            g,
+                            *stick,
+                            input.stick_tolerance,
+                            input.stick_snap_tolerance,
+                        )
+                    })
+                    .fold(Vec2::ZERO, |acc, e| {
+                        let acc_dist = acc.length();
+                        let e_dist = e.length();
+                        if e_dist > acc_dist {
+                            e
+                        } else {
+                            acc
+                        }
+                    });
 
                 if axes.x > input.stick_tolerance {
                     input.current_state.insert(ActionType::Right, true);

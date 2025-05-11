@@ -1,4 +1,4 @@
-use bevy::{prelude::*, utils::HashMap};
+use bevy::{platform::collections::HashMap, prelude::*};
 
 use crate::{
     focus_node::{FocusNode, FocusTarget},
@@ -42,7 +42,13 @@ pub struct UiSpatialMap {
 impl UiSpatialMap {
     pub fn new(
         menu_query: &Query<(Entity, &NavMenu)>,
-        query: &Query<(Entity, &Focusable, &Node, &GlobalTransform, &ViewVisibility)>,
+        query: &Query<(
+            Entity,
+            &Focusable,
+            &ComputedNode,
+            &GlobalTransform,
+            &InheritedVisibility,
+        )>,
         nav_state: &UiNavState,
     ) -> Self {
         // Collect the normal focusables that are not disabled
@@ -308,7 +314,7 @@ impl UiSpatialMap {
         let is_current_menu_wrap = self
             .current_menu
             .and_then(|menu_entity| self.menus.get(&menu_entity))
-            .map_or(false, |menu| menu.is_wrap);
+            .is_some_and(|menu| menu.is_wrap);
 
         // find the nearest, and furthest nodes in the direction of travel
         let (nearest, furthest) = self

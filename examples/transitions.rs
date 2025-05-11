@@ -20,7 +20,7 @@ fn main() {
         .add_systems(
             Update,
             handle_click_events
-                .run_if(on_event::<UiNavClickEvent>())
+                .run_if(on_event::<UiNavClickEvent>)
                 .after(UiNavSet),
         )
         .run();
@@ -49,7 +49,7 @@ enum ButtonAction {
 }
 
 fn startup(mut commands: Commands) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d);
 }
 
 fn on_enter_menu(mut next_play_state: ResMut<NextState<PlayState>>) {
@@ -62,7 +62,7 @@ fn on_enter_play(mut next_play_state: ResMut<NextState<PlayState>>) {
 
 fn setup_main_menu(mut commands: Commands) {
     root_full_screen_centered(&mut commands, StateScoped(AppState::Menu), |p| {
-        spawn_menu(true, false, p, (), |p| {
+        spawn_menu(true, false, p, ()).with_children(|p| {
             menu_title(p, "Main Menu");
             menu_button(p, "Play", true, false, false, ButtonAction::Play);
             menu_button(
@@ -80,7 +80,7 @@ fn setup_main_menu(mut commands: Commands) {
 
 fn setup_pause_menu(mut commands: Commands) {
     root_full_screen_centered(&mut commands, StateScoped(PlayState::Pause), |p| {
-        spawn_menu(true, false, p, (), |p| {
+        spawn_menu(true, false, p, ()).with_children(|p| {
             menu_title(p, "Pause");
             menu_button(
                 p,
@@ -112,7 +112,7 @@ fn handle_click_events(
             }
             ButtonAction::Debug(debug_text) => println!("clicked: {debug_text}"),
             ButtonAction::Quit => {
-                app_exit_writer.send(AppExit::Success);
+                app_exit_writer.write(AppExit::Success);
             }
         };
     }
