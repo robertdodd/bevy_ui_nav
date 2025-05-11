@@ -1,11 +1,7 @@
 #![allow(dead_code)]
 
-use bevy::{color::palettes::css, prelude::*};
+use bevy::{color::palettes::css, ecs::relationship::RelatedSpawnerCommands, prelude::*};
 use bevy_ui_nav::prelude::*;
-
-mod class_builder;
-
-pub use class_builder::*;
 
 pub struct ExampleUtilsPlugin;
 
@@ -44,19 +40,16 @@ impl From<FontSize> for f32 {
 pub fn root_full_screen_centered(
     commands: &mut Commands,
     extras: impl Bundle,
-    children: impl FnOnce(&mut ChildBuilder),
+    children: impl FnOnce(&mut RelatedSpawnerCommands<ChildOf>),
 ) {
     commands
         .spawn((
-            NodeBundle {
-                style: Style {
-                    width: Val::Percent(100.),
-                    height: Val::Percent(100.),
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Center,
-                    justify_content: JustifyContent::Center,
-                    ..default()
-                },
+            Node {
+                width: Val::Percent(100.),
+                height: Val::Percent(100.),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
                 ..default()
             },
             extras,
@@ -65,61 +58,55 @@ pub fn root_full_screen_centered(
 }
 
 /// Utility that spawns a nav menu.
-pub fn spawn_menu(
+pub fn spawn_menu<'w>(
     active: bool,
     locked: bool,
-    parent: &mut ChildBuilder,
+    parent: &'w mut RelatedSpawnerCommands<ChildOf>,
     extras: impl Bundle,
-    children: impl FnOnce(&mut ChildBuilder),
-) -> Entity {
-    parent
-        .spawn((
-            NavMenu {
-                is_priority: active,
-                is_wrap: true,
-                is_locked: locked,
+) -> EntityCommands<'w> {
+    parent.spawn((
+        NavMenu {
+            is_priority: active,
+            is_wrap: true,
+            is_locked: locked,
+        },
+        Node {
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            margin: UiRect::bottom(Val::Px(10.)),
+            padding: UiRect {
+                left: Val::Px(10.),
+                right: Val::Px(10.),
+                top: Val::Px(10.),
+                bottom: Val::Auto,
             },
-            NodeBundle {
-                style: Style {
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Center,
-                    justify_content: JustifyContent::Center,
-                    margin: UiRect::bottom(Val::Px(10.)),
-                    padding: UiRect {
-                        left: Val::Px(10.),
-                        right: Val::Px(10.),
-                        top: Val::Px(10.),
-                        bottom: Val::Auto,
-                    },
-                    border: UiRect::all(Val::Px(1.)),
-                    ..default()
-                },
-                border_color: Color::WHITE.into(),
-                ..default()
-            },
-            extras,
-        ))
-        .with_children(children)
-        .id()
+            border: UiRect::all(Val::Px(1.)),
+            ..default()
+        },
+        BorderColor(Color::WHITE),
+        extras,
+    ))
 }
 
 /// Utility that spawns a button for the grid.
 ///
 /// Its the same as spawn_button, except the button has no margin.
-pub fn text_widget(parent: &mut ChildBuilder, font_size: FontSize, text: impl Into<String>) {
-    parent.spawn(TextBundle::from_section(
-        text,
-        TextStyle {
-            color: Color::WHITE,
-            font_size: font_size.into(),
-            ..default()
-        },
+pub fn text_widget(
+    parent: &mut RelatedSpawnerCommands<ChildOf>,
+    font_size: FontSize,
+    text: impl Into<String>,
+) {
+    parent.spawn((
+        Text::new(text),
+        TextColor(Color::WHITE),
+        TextFont::from_font_size(font_size.into()),
     ));
 }
 
 /// Utility that spawns a button.
 pub fn menu_button(
-    parent: &mut ChildBuilder,
+    spawner: &mut RelatedSpawnerCommands<ChildOf>,
     text: impl Into<String>,
     focus: bool,
     disabled: bool,
@@ -127,7 +114,7 @@ pub fn menu_button(
     extras: impl Bundle,
 ) -> Entity {
     menu_buttoni(
-        parent,
+        spawner,
         text,
         (
             Focusable::default()
@@ -136,35 +123,37 @@ pub fn menu_button(
                 .with_mouse_only(mouse_only),
             extras,
         ),
-        (),
+        |_| {},
     )
 }
 
 /// Utility that spawns a button.
 pub fn menu_buttoni(
-    parent: &mut ChildBuilder,
+    spawner: &mut RelatedSpawnerCommands<ChildOf>,
     text: impl Into<String>,
     extras: impl Bundle,
-    class: impl ClassBuilder<ButtonBundle>,
+    class: impl FnOnce(&mut Node),
 ) -> Entity {
-    let mut bundle = ButtonBundle {
-        style: Style {
-            align_items: AlignItems::Center,
-            justify_content: JustifyContent::Center,
-            width: Val::Px(200.),
-            height: Val::Px(50.),
-            margin: UiRect::bottom(Val::Px(10.)),
-            border: UiRect::all(Val::Px(1.)),
-            ..default()
-        },
-        background_color: BUTTON_BG_DEFAULT.into(),
-        border_color: BUTTON_BG_DEFAULT.into(),
+    let mut node = Node {
+        align_items: AlignItems::Center,
+        justify_content: JustifyContent::Center,
+        width: Val::Px(200.),
+        height: Val::Px(50.),
+        margin: UiRect::bottom(Val::Px(10.)),
+        border: UiRect::all(Val::Px(1.)),
         ..default()
     };
-    class.apply(&mut bundle);
+    class(&mut node);
 
-    parent
-        .spawn((StyledButton, bundle, extras))
+    spawner
+        .spawn((
+            StyledButton,
+            node,
+            BackgroundColor(BUTTON_BG_DEFAULT.into()),
+            BorderColor(BUTTON_BG_DEFAULT.into()),
+            Button,
+            extras,
+        ))
         .with_children(|p| {
             text_widget(p, FontSize::Small, text);
         })
@@ -172,7 +161,7 @@ pub fn menu_buttoni(
 }
 
 /// Utility that spawns a title.
-pub fn menu_title(parent: &mut ChildBuilder, text: impl Into<String>) {
+pub fn menu_title(parent: &mut RelatedSpawnerCommands<ChildOf>, text: impl Into<String>) {
     text_widget(parent, FontSize::Large, text);
 }
 

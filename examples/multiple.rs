@@ -12,19 +12,13 @@ fn main() {
         .add_systems(
             Update,
             (
-                handle_scroll,
-                (
-                    handle_click_events.run_if(on_event::<UiNavClickEvent>()),
-                    handle_cancel_events.run_if(on_event::<UiNavCancelEvent>()),
-                )
-                    .after(UiNavSet),
-            ),
+                handle_click_events.run_if(on_event::<UiNavClickEvent>),
+                handle_cancel_events.run_if(on_event::<UiNavCancelEvent>),
+            )
+                .after(UiNavSet),
         )
         .run();
 }
-
-#[derive(Component)]
-struct MenuScroll;
 
 #[derive(Component)]
 struct MainMenu;
@@ -40,7 +34,7 @@ enum ButtonAction {
 }
 
 fn startup(mut commands: Commands) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d);
 
     let mut settings_menu = None;
     let mut graphics_menu = None;
@@ -48,12 +42,9 @@ fn startup(mut commands: Commands) {
 
     // Spawn a button that can only be triggered by clicking it
     commands
-        .spawn(NodeBundle {
-            style: Style {
-                width: Val::Percent(100.),
-                margin: UiRect::vertical(Val::Px(20.)),
-                ..default()
-            },
+        .spawn(Node {
+            width: Val::Percent(100.),
+            margin: UiRect::vertical(Val::Px(20.)),
             ..default()
         })
         .with_children(|p| {
@@ -61,32 +52,35 @@ fn startup(mut commands: Commands) {
         });
 
     commands
-        .spawn((
-            MenuScroll,
-            NodeBundle {
-                style: Style {
-                    width: Val::Percent(100.),
-                    height: Val::Percent(100.),
-                    ..default()
-                },
-                ..default()
-            },
-        ))
+        .spawn(Node {
+            width: Val::Percent(100.),
+            height: Val::Percent(100.),
+            ..default()
+        })
         .with_children(|p| {
             // Main Menu
-            settings_menu = Some(spawn_menu(true, false, p, MainMenu, |p| {
-                menu_title(p, "Settings");
-            }));
+            let settings_menu_entity = spawn_menu(true, false, p, MainMenu)
+                .with_children(|p| {
+                    menu_title(p, "Settings");
+                })
+                .id();
+            settings_menu = Some(settings_menu_entity);
 
             // Graphics Menu
-            graphics_menu = Some(spawn_menu(false, false, p, MainMenu, |p| {
-                menu_title(p, "Graphics");
-            }));
+            let graphics_menu_entity = spawn_menu(false, false, p, MainMenu)
+                .with_children(|p| {
+                    menu_title(p, "Graphics");
+                })
+                .id();
+            graphics_menu = Some(graphics_menu_entity);
 
             // Sound Menu
-            sound_menu = Some(spawn_menu(false, false, p, MainMenu, |p| {
-                menu_title(p, "Sound");
-            }));
+            let sound_menu_entity = spawn_menu(false, false, p, MainMenu)
+                .with_children(|p| {
+                    menu_title(p, "Sound");
+                })
+                .id();
+            sound_menu = Some(sound_menu_entity);
         });
 
     if let (Some(settings_menu), Some(graphics_menu), Some(sound_menu)) =
@@ -177,21 +171,6 @@ fn startup(mut commands: Commands) {
     }
 }
 
-fn handle_scroll(keys: Res<ButtonInput<KeyCode>>, mut query: Query<&mut Style, With<MenuScroll>>) {
-    let direction = if keys.just_pressed(KeyCode::KeyW) {
-        Some(-1.)
-    } else if keys.just_pressed(KeyCode::KeyS) {
-        Some(1.)
-    } else {
-        None
-    };
-    if let Some(direction) = direction {
-        let mut style = query.single_mut();
-        let current = if let Val::Px(v) = style.top { v } else { 0. };
-        style.top = Val::Px(current + direction * 10.);
-    }
-}
-
 fn handle_click_events(
     mut events: EventReader<UiNavClickEvent>,
     query: Query<&ButtonAction, With<Focusable>>,
@@ -210,14 +189,14 @@ fn handle_click_events(
         println!("ClickEvent: {:?}", button_action);
         match button_action {
             ButtonAction::Menu(menu) => {
-                nav_request_writer.send(NavRequest::SetFocus {
+                nav_request_writer.write(NavRequest::SetFocus {
                     entity: *menu,
                     interaction_type: UiNavInteractionType::Manual,
                 });
             }
             ButtonAction::Debug(debug_text) => println!("clicked: {debug_text}"),
             ButtonAction::Quit => {
-                app_exit_writer.send(AppExit::Success);
+                app_exit_writer.write(AppExit::Success);
             }
         };
     }
@@ -231,7 +210,7 @@ fn handle_cancel_events(
     for event in events.read() {
         if let Ok(menu_parent) = query.get(event.0) {
             println!("CancelEvent: {:?}", event);
-            nav_request_writer.send(NavRequest::SetFocus {
+            nav_request_writer.write(NavRequest::SetFocus {
                 entity: menu_parent.0,
                 interaction_type: UiNavInteractionType::Manual,
             });

@@ -13,7 +13,7 @@ fn main() {
             Update,
             handle_click_events
                 .after(UiNavSet)
-                .run_if(on_event::<UiNavClickEvent>()),
+                .run_if(on_event::<UiNavClickEvent>),
         )
         .run();
 }
@@ -27,18 +27,18 @@ enum ButtonAction {
 }
 
 fn startup(mut commands: Commands) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d);
 
     root_full_screen_centered(&mut commands, (), |p| {
         // spawn a menu
-        spawn_menu(true, false, p, (), |p| {
+        spawn_menu(true, false, p, ()).with_children(|p| {
             menu_button(p, "Option 1", true, false, false, ButtonAction::Option1);
             menu_button(p, "Option 2", false, false, false, ButtonAction::Option2);
             menu_button(p, "Disabled", false, true, false, ButtonAction::Option2);
         });
 
         // spawn a second menu
-        spawn_menu(false, false, p, (), |p| {
+        spawn_menu(false, false, p, ()).with_children(|p| {
             menu_button(p, "Save", true, false, false, ButtonAction::Save);
             menu_button(p, "Quit", false, false, false, ButtonAction::Quit);
         });
@@ -55,7 +55,7 @@ fn handle_click_events(
             println!("ClickEvent: {:?}", button_action);
             match *button_action {
                 ButtonAction::Quit => {
-                    app_exit_writer.send(AppExit::Success);
+                    app_exit_writer.write(AppExit::Success);
                 }
                 ButtonAction::Save => (),
                 _ => (),
