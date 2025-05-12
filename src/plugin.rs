@@ -39,7 +39,8 @@ impl Plugin for BevyUiNavPlugin {
                             handle_interactions
                                 .run_if(on_event::<CursorMoved>.or(on_event::<MouseButtonInput>)),
                             handle_gamepad_input,
-                            handle_keyboard_input,
+                            handle_keyboard_input_events.run_if(on_event::<KeyboardInput>),
+                            handle_keyboard_input_presses,
                         )
                             .chain(),
                         tick_pressed_timer,
@@ -486,7 +487,7 @@ fn update_focusable_visibility(
 }
 
 /// This system prints out all keyboard events as they come in
-fn handle_keyboard_input(
+fn handle_keyboard_input_events(
     mut events: EventReader<KeyboardInput>,
     mut nav_request_writer: EventWriter<NavRequest>,
     input_manager: Res<UiNavInputManager>,
@@ -511,17 +512,49 @@ fn handle_keyboard_input(
                         (ActionType::Right, ButtonState::Pressed) => {
                             Some(NavRequest::Movement(UiNavDirection::Right))
                         }
-                        (ActionType::Action, ButtonState::Pressed) => Some(NavRequest::ActionPress),
-                        (ActionType::Action, ButtonState::Released) => {
-                            Some(NavRequest::ActionRelease)
-                        }
-                        (ActionType::Cancel, ButtonState::Pressed) => Some(NavRequest::Cancel),
+                        // NOTE: we do not handle `ActionType::Action` or `ActionType::Cancel` presses here, as we
+                        //  only want to handle those when just pressed or just released. They are handled in
+                        //  `handle_keyboard_input_presses`.
                         _ => None,
                     };
                     if let Some(nav_request) = nav_request {
                         nav_request_writer.write(nav_request);
                     }
                 }
+            }
+        }
+    }
+}
+
+/// This system prints out all keyboard events as they come in
+fn handle_keyboard_input_presses(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut nav_request_writer: EventWriter<NavRequest>,
+    input_manager: Res<UiNavInputManager>,
+) {
+    for action in input_manager.input_map.iter() {
+        if let InputMapping::Key { keycode, action } = action {
+            let nav_request = match action {
+                ActionType::Action => {
+                    if keys.just_pressed(*keycode) {
+                        Some(NavRequest::ActionPress)
+                    } else if keys.just_released(*keycode) {
+                        Some(NavRequest::ActionRelease)
+                    } else {
+                        None
+                    }
+                }
+                ActionType::Cancel => {
+                    if keys.just_pressed(*keycode) {
+                        Some(NavRequest::Cancel)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            };
+            if let Some(nav_request) = nav_request {
+                nav_request_writer.write(nav_request);
             }
         }
     }
