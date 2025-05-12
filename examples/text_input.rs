@@ -216,11 +216,13 @@ fn update_title_label(game_data: Res<GameData>, mut query: Query<&mut TextSpan, 
 
 /// System that listens for characer key presses in the text control
 fn listen_received_character_events(
+    keys: Res<ButtonInput<KeyCode>>,
     mut events: EventReader<KeyboardInput>,
     mut query: Query<(&mut TextControl, &mut TextControlStatus, &Children)>,
     mut text_query: Query<&mut Text>,
     mut nav_request_writer: EventWriter<NavRequest>,
     mut game_data: ResMut<GameData>,
+    button_query: Query<(Entity, &ButtonAction)>,
 ) {
     for event in events.read() {
         if event.state == ButtonState::Pressed {
@@ -240,10 +242,26 @@ fn listen_received_character_events(
                         true
                     }
                     Key::Enter => {
-                        *status = TextControlStatus::InActive;
-                        nav_request_writer.write(NavRequest::Unlock);
-                        game_data.name.clone_from(&text_control.0);
-                        true
+                        if !keys.just_pressed(KeyCode::Enter) {
+                            false
+                        } else {
+                            *status = TextControlStatus::InActive;
+                            game_data.name.clone_from(&text_control.0);
+                            // unlock navigation
+                            nav_request_writer.write(NavRequest::Unlock);
+                            // set focus on the submit button
+                            if let Some(submit_button) = button_query
+                                .iter()
+                                .find(|(_, action)| matches!(action, ButtonAction::Reset))
+                                .map(|(e, _)| e)
+                            {
+                                nav_request_writer.write(NavRequest::SetFocus {
+                                    entity: submit_button,
+                                    interaction_type: UiNavInteractionType::Manual,
+                                });
+                            }
+                            true
+                        }
                     }
                     Key::Space => {
                         text_control.0.push(' ');
