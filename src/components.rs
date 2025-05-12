@@ -120,8 +120,13 @@ impl Focusable {
         self.is_hovered_interaction && !self.is_disabled
     }
 
-    /// Enables a `Focusable` that is disabled. No effect if it is enabled.
+    /// Enables a `Focusable`.
     pub fn enable(&mut self) {
         self.is_disabled = false;
+    }
+
+    /// Disables a `Focusable`.
+    pub fn disable(&mut self) {
+        self.is_disabled = true;
     }
 }
