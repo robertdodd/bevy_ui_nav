@@ -207,7 +207,7 @@ fn handle_focus_change_events(mut events: EventReader<UiNavFocusChangedEvent>) {
 
 | `bevy_ui_nav`   | `bevy` |
 |:----------------|:-------|
-| `0.2`           | `0.16` |
+| `0.2` - `0.3`   | `0.16` |
 | `0.1`           | `0.13` |
 
 # Credits
