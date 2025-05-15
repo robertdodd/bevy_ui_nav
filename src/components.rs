@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::types::*;
 
 /// Component defining a menu that contains `Focusable` entities.
-#[derive(Component, Default, Debug, Clone, Reflect)]
+#[derive(Component, Debug, Clone, Reflect)]
 #[reflect(Component, Default, Debug)]
 pub struct NavMenu {
     /// Whether this menu should be made active when it is spawned. Changing this value after it is spawned will not
@@ -15,6 +15,16 @@ pub struct NavMenu {
     pub is_locked: bool,
 }
 
+impl Default for NavMenu {
+    fn default() -> Self {
+        Self {
+            is_priority: false,
+            is_wrap: true,
+            is_locked: false,
+        }
+    }
+}
+
 impl NavMenu {
     pub fn new(is_priority: bool, is_wrap: bool) -> Self {
         Self {
@@ -24,9 +34,23 @@ impl NavMenu {
         }
     }
 
-    /// Sets the `is_locked` value and returns the `NavMenu`.
-    pub fn with_locked(mut self, locked: bool) -> Self {
-        self.is_locked = locked;
+    /// Sets the `is_locked` value to `true` and returns the `NavMenu`.
+    /// This will lock navigation to and from the menu except via explicity sending `NavRequest::SetFocus` events.
+    pub fn locked(mut self) -> Self {
+        self.is_locked = true;
+        self
+    }
+
+    /// Sets the `is_wrap` value and returns the `NavMenu`.
+    pub fn with_wrap(mut self, is_wrap: bool) -> Self {
+        self.is_wrap = is_wrap;
+        self
+    }
+
+    /// Sets the `is_priority` value to `true` and returns the `NavMenu`.
+    /// This will cause the menu to take focus as soon as it is spawned.
+    pub fn prioritized(mut self) -> Self {
+        self.is_priority = true;
         self
     }
 }

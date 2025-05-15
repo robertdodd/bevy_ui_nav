@@ -75,6 +75,8 @@ fn setup_new_menus(
         return;
     }
 
+    let has_current_menu = nav_state.menu.is_some_and(|e| menu_query.contains(e));
+
     // The new target menu and whether it is prioritized. We need to track and handle this outside the iterator
     // because multiple menus can be spawned simultaneously.
     let mut new_focus: Option<(Entity, bool)> = None;
@@ -85,18 +87,15 @@ fn setup_new_menus(
         ) {
             // This menu has priority, and `new_focus` references a non-priority menu.
             new_focus = Some((entity, true));
-        } else if new_focus.is_none() && !menu.is_locked {
+        } else if new_focus.is_none() && !has_current_menu && !menu.is_locked {
             // This menu is not prioritized, but is the only one we spawned this frame, so set focus to it.
             new_focus = Some((entity, false));
         }
     }
 
     // set focus to this menu if there is no current menu
-    let has_current_menu = nav_state.menu.is_some_and(|e| menu_query.contains(e));
-    if let (Some((target, _)), false) = (new_focus, has_current_menu) {
-        if !has_current_menu {
-            nav_state.menu = Some(target);
-        }
+    if let Some((target, _)) = new_focus {
+        nav_state.menu = Some(target);
     }
 
     nav_request_writer.write(NavRequest::Refresh);
@@ -220,13 +219,15 @@ fn handle_interactions(
             continue;
         }
 
+        // ignore if the focusable is outside the current menu and either:
+        // - in a menu that is locked
+        // - the current menu is locked
         let is_menu_locked = focusable
             .menu
             .and_then(|menu_entity| menu_query.get(menu_entity).ok())
             .is_some_and(|nav_menu| nav_menu.is_locked);
-
         let is_in_current_menu = focusable.menu == nav_state.menu;
-        if !(is_in_current_menu || !(is_current_menu_locked && is_menu_locked)) {
+        if !is_in_current_menu && (is_current_menu_locked || is_menu_locked) {
             continue;
         }
 

@@ -60,13 +60,13 @@ impl UiSpatialMap {
         let mut mouse_only_focusables = HashMap::<Entity, FocusNode>::new();
         query
             .iter()
-            // Ignore disables nodes, hidden nodes or nodes with 0 size along one dimension
+            // Ignore disables nodes, hidden nodes or nodes with 0 size along one dimension, unless the focusable has
+            // priority.
+            // NOTE: We must ignore the size/visibility of focusables with priority because the size and visibility
+            //  won't be computed until after the `PostUpdate` set.
             .filter(|(_, focusable, node, _, visibility)| {
-                let size = node.size();
                 !focusable.is_disabled
-                    && visibility.get()
-                    && size.x > f32::EPSILON
-                    && size.y > f32::EPSILON
+                    && (focusable.is_priority || is_node_visible(visibility.get(), node.size()))
             })
             .for_each(|(entity, focusable, node, global_transform, _)| {
                 let focus_node = FocusNode {
@@ -420,4 +420,8 @@ impl UiSpatialMap {
             self.current_interaction_type = Some(UiNavInteractionType::Button);
         }
     }
+}
+
+fn is_node_visible(is_visible: bool, size: Vec2) -> bool {
+    is_visible && size.x > f32::EPSILON && size.y > f32::EPSILON
 }
