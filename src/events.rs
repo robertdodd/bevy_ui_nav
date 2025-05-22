@@ -27,6 +27,13 @@ pub struct UiNavCancelEvent(pub Entity);
 #[reflect(Debug, PartialEq, Hash)]
 pub struct UiNavClickEvent(pub Entity);
 
+/// Event emitted when a focusable is clicked.
+///
+/// This event is sent by this plugin and should be handled by the user.
+#[derive(Event, Debug, PartialEq, Reflect, Hash)]
+#[reflect(Debug, PartialEq, Hash)]
+pub struct PressableClick(pub Entity);
+
 /// Event used internally to trigger a UI navigation request.
 ///
 /// These events are emitted in response to keyboard or gamepad button input.
@@ -40,6 +47,8 @@ pub enum NavRequest {
     },
     /// Move focus in a specific direction
     Movement(UiNavDirection),
+    /// Move focus in a specific direction
+    MovementReleased,
     /// Press the action key
     ActionPress,
     /// Release the action key

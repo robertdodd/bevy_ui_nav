@@ -20,7 +20,6 @@ pub(crate) struct FocusTarget {
 /// Type used internally to define a focus node's position and size.
 #[derive(Debug, Clone)]
 pub(crate) struct FocusNode {
-    pub menu: Option<Entity>,
     pub size: Vec2,
     pub position: Vec2,
     pub is_priority: bool,

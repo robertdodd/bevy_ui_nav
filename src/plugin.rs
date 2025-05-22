@@ -1,18 +1,10 @@
 use bevy::{
-    input::{keyboard::KeyboardInput, mouse::MouseButtonInput, ButtonState},
+    ecs::query::{QueryData, QueryFilter},
+    input::mouse::MouseButtonInput,
     prelude::*,
-    ui::RelativeCursorPosition,
 };
 
-use crate::{
-    components::*,
-    events::*,
-    input::*,
-    resources::*,
-    spatial_map::{UiSpatialMap, UiSpatialMapEvent},
-    types::*,
-    utils::*,
-};
+use crate::{components::*, events::*, input::*, resolve::resolve_2d, resources::*, types::*};
 
 pub struct BevyUiNavPlugin;
 
@@ -22,29 +14,29 @@ impl Plugin for BevyUiNavPlugin {
             .add_event::<UiNavCancelEvent>()
             .add_event::<NavRequest>()
             .add_event::<UiNavFocusChangedEvent>()
+            .add_event::<PressableClick>()
             .init_resource::<UiNavState>()
             .init_resource::<UiNavSettings>()
             .init_resource::<UiNavInputManager>()
             .add_systems(
+                PreUpdate,
+                (setup_new_menus, setup_new_focusables, setup_new_pressables).chain(),
+            )
+            .add_systems(
                 Update,
                 (
                     (
-                        (
-                            handle_current_menu_removed.run_if(any_component_removed::<NavMenu>),
-                            setup_new_menus,
-                            setup_new_focusables,
-                        )
-                            .chain(),
+                        handle_current_menu_removed.run_if(any_component_removed::<NavMenu>),
                         (
                             handle_interactions
                                 .run_if(on_event::<CursorMoved>.or(on_event::<MouseButtonInput>)),
-                            handle_gamepad_input,
-                            handle_keyboard_input_events.run_if(on_event::<KeyboardInput>),
-                            handle_keyboard_input_presses,
+                            update_input,
+                            // handle_gamepad_input,
+                            // handle_keyboard_input_events.run_if(on_event::<KeyboardInput>),
+                            // handle_keyboard_input_presses,
                         )
                             .chain(),
                         tick_pressed_timer,
-                        update_focusable_visibility,
                         handle_focusable_changed,
                     )
                         .before(UiNavSet),
@@ -101,20 +93,11 @@ fn setup_new_menus(
     nav_request_writer.write(NavRequest::Refresh);
 }
 
-/// System that initializes newly added focusables.
-#[allow(clippy::type_complexity)]
+/// System that initializes new `Pressable` entities by adding their relationship to their root `Focusable` entity.
 fn setup_new_focusables(
     mut commands: Commands,
-    mut query: Query<
-        (
-            Entity,
-            &mut Focusable,
-            Has<Interaction>,
-            Has<RelativeCursorPosition>,
-        ),
-        Added<Focusable>,
-    >,
-    parent_query: Query<&ChildOf>,
+    mut query: Query<(Entity, &Focusable), (Added<Focusable>, Without<FocusableOf>)>,
+    child_of_query: Query<&ChildOf>,
     menu_query: Query<(), With<NavMenu>>,
     nav_state: Res<UiNavState>,
     mut nav_request_writer: EventWriter<NavRequest>,
@@ -126,47 +109,25 @@ fn setup_new_focusables(
     // define the first focusable that needs to be given focus
     let mut new_focus = None;
 
-    for (entity, mut focusable, has_interaction, has_relative_cursor_position) in query.iter_mut() {
-        // ensure the entity has a `RelativeCursorPosition` component
-        let mut cmds = commands.entity(entity);
-        if !has_interaction {
-            cmds.try_insert(Interaction::default());
-        }
-        if !has_relative_cursor_position {
-            cmds.try_insert(RelativeCursorPosition::default());
-        }
+    for (entity, focusable) in query.iter_mut() {
+        // insert the relationship if we found the root `NavMenu`, otherwise log a warning
+        if let Some(parent) = find_parent(entity, &child_of_query, &menu_query) {
+            commands.entity(entity).insert(FocusableOf(parent));
 
-        if focusable.menu.is_none() {
-            let mut current = entity;
-            let mut menu_parent = None;
-
-            while let Ok(parent) = parent_query.get(current) {
-                if menu_query.contains(parent.0) {
-                    menu_parent = Some(parent.0);
-                    break;
-                } else {
-                    current = parent.0;
-                }
+            // set initial focus on this entity if it is prioritized, and in the current menu
+            if focusable.is_priority
+                && !focusable.is_disabled
+                && Some(parent) == nav_state.menu
+                && new_focus.is_none()
+            {
+                new_focus = Some(entity);
             }
-
-            if let Some(menu_parent) = menu_parent {
-                focusable.menu = Some(menu_parent);
-
-                // set initial focus on this entity if it is prioritized, and in the current menu
-                if focusable.is_priority
-                    && !focusable.is_disabled
-                    && Some(menu_parent) == nav_state.menu
-                    && new_focus.is_none()
-                    && !focusable.is_mouse_only
-                {
-                    new_focus = Some(entity);
-                }
-            } else if !focusable.is_mouse_only {
-                warn!("A `Focusable` was added without a root `Menu` entity in it's heirarchy. This `Focusable` will not function.");
-            }
+        } else {
+            warn!("A `Focusable` was added outside of a root `NavMenu`");
         }
     }
 
+    // focus on the new focusable
     if let Some(new_focus) = new_focus {
         nav_request_writer.write(NavRequest::SetFocus {
             entity: new_focus,
@@ -177,17 +138,16 @@ fn setup_new_focusables(
 
 /// System that handles bevy `Interaction` changes.
 ///
-/// Interaction changes are only respected if the mouse was moved AND the new interaction state is
-/// `Interaction::Hovered`.
+/// When an interaction changes the navigation state of `Focusables` is removed, but the current focusable is
+/// remembered in case the user switches back to ui navigatin mode.
 fn handle_interactions(
     mut cursor_moved_events: EventReader<CursorMoved>,
     mut mouse_button_input_events: EventReader<MouseButtonInput>,
-    mut query: Query<(
-        Entity,
-        &Interaction,
-        &mut Focusable,
-        &RelativeCursorPosition,
-    )>,
+    mut query: Query<
+        (&mut Pressable, &PressableOf, &Interaction),
+        (Changed<Interaction>, With<Pressable>),
+    >,
+    focusable_query: Query<(&Focusable, &FocusableOf)>,
     menu_query: Query<&NavMenu>,
     mut nav_request_writer: EventWriter<NavRequest>,
     mut click_writer: EventWriter<UiNavClickEvent>,
@@ -204,72 +164,64 @@ fn handle_interactions(
         return;
     }
 
-    // check if blocked by a press on another entity
-    let is_blocked = query
-        .iter()
-        .any(|(__, _, focusable, _)| focusable.is_pressed());
-
     let is_current_menu_locked = nav_state
         .menu
         .and_then(|e| menu_query.get(e).ok())
         .is_some_and(|nav_menu| nav_menu.is_locked);
 
-    for (entity, interaction, mut focusable, relative_cursor_position) in query.iter_mut() {
-        if focusable.is_disabled {
-            continue;
-        }
-
-        // ignore if the focusable is outside the current menu and either:
-        // - in a menu that is locked
-        // - the current menu is locked
-        let is_menu_locked = focusable
-            .menu
-            .and_then(|menu_entity| menu_query.get(menu_entity).ok())
-            .is_some_and(|nav_menu| nav_menu.is_locked);
-        let is_in_current_menu = focusable.menu == nav_state.menu;
-        if !is_in_current_menu && (is_current_menu_locked || is_menu_locked) {
-            continue;
-        }
-
-        let is_mouse_over = relative_cursor_position.mouse_over();
-        // focus on this entity
-        let (is_pressed, is_hovered) = match *interaction {
-            Interaction::Pressed => (true, is_mouse_over),
-            Interaction::Hovered => (false, true),
-            Interaction::None => (false, false),
-        };
-        if focusable.is_mouse_only && !is_hovered && !is_pressed {
-            focusable.is_focused = false;
-            focusable.is_pressed_interaction = false;
-            focusable.is_pressed_interaction_from_active = false;
-            focusable.is_hovered_interaction = false;
-        } else if is_pressed != focusable.is_pressed_interaction {
-            // send click events
-            if focusable.is_pressed_interaction
-                && focusable.is_pressed_interaction_from_active
-                && !is_pressed
-                && is_mouse_over
-            {
-                click_writer.write(UiNavClickEvent(entity));
+    for (mut pressable, pressable_of, interaction) in query.iter_mut() {
+        // update the pressable state
+        match *interaction {
+            Interaction::Pressed => {
+                pressable._is_pressed_interaction = true;
+                pressable._is_hover_interaction = true
             }
-            // update focusable
-            focusable.is_pressed_interaction = is_pressed;
-            focusable.is_pressed_interaction_from_active = !is_blocked;
-        }
-        if is_hovered != focusable.is_hovered_interaction {
-            focusable.is_hovered_interaction = is_hovered;
+            Interaction::Hovered => {
+                pressable._is_hover_interaction = true;
+                pressable._is_pressed_interaction = false;
+            }
+            Interaction::None => {
+                pressable._is_pressed_interaction = false;
+                pressable._is_hover_interaction = false;
+            }
         }
 
-        // Set focus on the entity
-        if (*interaction == Interaction::Hovered
-            || (*interaction == Interaction::Pressed && is_mouse_over))
-            && !focusable.active()
-            && !is_blocked
-        {
+        // ignore all except receiving focus
+        if *interaction == Interaction::None {
+            continue;
+        }
+
+        if let Ok((focusable, focusable_of)) = focusable_query.get(pressable_of.0) {
+            // ignore if the focusable is disabled or already active
+            if focusable.is_disabled || focusable.active() {
+                continue;
+            }
+
+            // ignore if the focusable is outside the current menu and either:
+            // - in a menu that is locked
+            // - the current menu is locked
+            let is_menu_locked = menu_query
+                .get(focusable_of.0)
+                .map_or(true, |menu| menu.is_locked);
+            let is_in_current_menu = Some(focusable_of.0) == nav_state.menu;
+            if !is_in_current_menu && (is_current_menu_locked || is_menu_locked) {
+                continue;
+            }
+
+            // Set focus on the focusable
             nav_request_writer.write(NavRequest::SetFocus {
-                entity,
+                entity: pressable_of.0,
                 interaction_type: UiNavInteractionType::Mouse,
             });
+
+            // TODO: do this when handling the NavRequest::SetFocus for a mouse interaction
+            // // clear focus from nav state
+            // nav_state.focusable = None;
+            // nav_state.last_focusable = Some(entity);
+
+            if *interaction == Interaction::Pressed {
+                click_writer.write(UiNavClickEvent(pressable_of.0));
+            }
         }
     }
 }
@@ -290,58 +242,197 @@ fn handle_current_menu_removed(
     nav_request_writer.write(NavRequest::Refresh);
 }
 
-/// System that listens for keyboard or gamepad input and emits the appropriate navigation events.
-#[allow(clippy::too_many_arguments)]
-fn handle_gamepad_input(
-    gamepads: Query<(Entity, &Gamepad)>,
-    mut nav_request_writer: EventWriter<NavRequest>,
-    mut nav_state: ResMut<UiNavState>,
-    settings: Res<UiNavSettings>,
-    mut input_manager: ResMut<UiNavInputManager>,
-) {
-    update_input_manager(&mut input_manager, &gamepads);
+// /// System that listens for keyboard or gamepad input and emits the appropriate navigation events.
+// #[allow(clippy::too_many_arguments)]
+// fn handle_gamepad_input(
+//     gamepads: Query<(Entity, &Gamepad)>,
+//     mut nav_request_writer: EventWriter<NavRequest>,
+//     mut nav_state: ResMut<UiNavState>,
+//     settings: Res<UiNavSettings>,
+//     mut input_manager: ResMut<UiNavInputManager>,
+// ) {
+//     update_input_manager(&mut input_manager, &gamepads);
 
-    if nav_state.menu.is_some() && !nav_state.locked {
-        // send movement event
-        if let Some(direction) = input_manager.direction() {
-            if nav_state.direction.is_none() {
-                // send movement key on first pressed
-                nav_request_writer.write(NavRequest::Movement(direction));
-            } else {
-                // send movement key on timer tick while held
-                let movement_speed = f32_lerp(
-                    settings.movement_speed_slow,
-                    settings.movement_speed_fast,
-                    (nav_state.hold_timer.elapsed_secs() / settings.movement_acceleration_time)
-                        .min(1.),
-                );
-                if nav_state.nav_timer.elapsed_secs() > movement_speed {
-                    nav_request_writer.write(NavRequest::Movement(direction));
-                    nav_state.nav_timer.reset();
+//     if nav_state.menu.is_some() && !nav_state.locked {
+//         // send movement event
+//         if let Some(direction) = input_manager.direction() {
+//             if nav_state.direction.is_none() {
+//                 // send movement key on first pressed
+//                 nav_request_writer.write(NavRequest::Movement(direction));
+//             } else {
+//                 // send movement key on timer tick while held
+//                 let movement_speed = f32_lerp(
+//                     settings.movement_speed_slow,
+//                     settings.movement_speed_fast,
+//                     (nav_state.hold_timer.elapsed_secs() / settings.movement_acceleration_time)
+//                         .min(1.),
+//                 );
+//                 if nav_state.nav_timer.elapsed_secs() > movement_speed {
+//                     nav_request_writer.write(NavRequest::Movement(direction));
+//                     nav_state.nav_timer.reset();
+//                 }
+//             }
+//             nav_state.direction = Some(direction);
+//         } else if nav_state.direction.is_some() {
+//             nav_state.clear_direction();
+//         }
+
+//         // send action press event
+//         if input_manager.just_pressed(ActionType::Action) {
+//             nav_request_writer.write(NavRequest::ActionPress);
+//         } else if input_manager.just_released(ActionType::Action) {
+//             nav_request_writer.write(NavRequest::ActionRelease);
+//         }
+//     } else if nav_state.direction.is_some() {
+//         // clear direction keys when the menu is locked, or we don't have a current menu
+//         nav_state.clear_direction();
+//     }
+
+//     if input_manager.is_direction_released() {
+//         nav_request_writer.write(NavRequest::MovementReleased);
+//     }
+
+//     // send cancel event
+//     // NOTE: This runs even when locked, in case the user wishes to lsiten for cancel events in order to unlock
+//     // navigation.
+//     if input_manager.just_pressed(ActionType::Cancel) {
+//         nav_request_writer.write(NavRequest::Cancel);
+//     }
+// }
+
+/// Util that returns the focusable and menu `Entity` for the `entity` of a `NavRequest::SetFocus` event, and checks
+/// that focus can be set to the target entity.
+/// `entity` can be a `Focusable` or `NavMenu`.
+#[allow(clippy::too_many_arguments)]
+fn try_set_focus(
+    entity: Entity,
+    query: &Query<(
+        &Focusable,
+        &FocusableOf,
+        &ComputedNode,
+        &GlobalTransform,
+        &InheritedVisibility,
+        &Pressables,
+    )>,
+    menu_query: &Query<(Entity, &NavMenu, &Focusables)>,
+) -> Option<Entity> {
+    if let Ok((focusable, ..)) = query.get(entity) {
+        // if the target entity is a focusable, check that it is not disabled.
+        if focusable.is_disabled {
+            None
+        } else {
+            Some(entity)
+        }
+    } else if let Ok((_, _, focusables)) = menu_query.get(entity) {
+        // find the first non-disabled focusable in the nav menu to focus on.
+        // try find a prioritized focusable first, otherwise use the first one.
+        let first_focusable = focusables
+            .iter()
+            .filter_map(|e| {
+                query
+                    .get(e)
+                    .map(|(focusable, ..)| (e, focusable.is_priority, focusable.is_disabled))
+                    .ok()
+            })
+            .filter(|(_, _, is_disabled)| !is_disabled)
+            .reduce(|acc, e| if e.1 { e } else { acc })
+            .map(|(e, ..)| e);
+
+        // if we found a focusable in the menu, focus on it
+        if let Some(focusable_entity) = first_focusable {
+            Some(focusable_entity)
+        } else {
+            warn!("Tried to set focus to nav menu, but it contained no active focusables.");
+            None
+        }
+    } else {
+        warn!("Tried to set focus to invalid entity.");
+        None
+    }
+}
+
+/// Set focus on an entity and remove focus from the old one.
+fn set_focus_to(
+    from: Option<Entity>,
+    to: Entity,
+    query: &mut Query<(
+        &mut Focusable,
+        &FocusableOf,
+        &ComputedNode,
+        &GlobalTransform,
+        &InheritedVisibility,
+        &Pressables,
+    )>,
+    pressable_query: &mut Query<&mut Pressable>,
+    nav_state: &mut UiNavState,
+    clear_focus: bool,
+) {
+    // remove focus from the old focusable
+    if let Some(from) = from {
+        if let Ok((mut focusable, _, _, _, _, pressables)) = query.get_mut(from) {
+            focusable.is_focused = false;
+            for pressable in pressables {
+                if let Ok(mut pressable) = pressable_query.get_mut(*pressable) {
+                    pressable._is_hover_focusable = false;
+                    pressable._is_pressed_focusable = false;
                 }
             }
-            nav_state.direction = Some(direction);
-        } else if nav_state.direction.is_some() {
-            nav_state.clear_direction();
+        }
+    }
+    nav_state.menu = None;
+
+    // set focus to the new focusable
+    if let Ok((mut focusable, focusable_of, ..)) = query.get_mut(to) {
+        if !clear_focus {
+            focusable.is_focused = true;
         }
 
-        // send action press event
-        if input_manager.just_pressed(ActionType::Action) {
-            nav_request_writer.write(NavRequest::ActionPress);
-        } else if input_manager.just_released(ActionType::Action) {
-            nav_request_writer.write(NavRequest::ActionRelease);
-        }
-    } else if nav_state.direction.is_some() {
-        // clear direction keys when the menu is locked, or we don't have a current menu
-        nav_state.clear_direction();
+        // TODO: don't set focus if focus was given using the mouse
+        nav_state.menu = Some(focusable_of.0);
+        nav_state.last_focusable = Some(to);
     }
+}
 
-    // send cancel event
-    // NOTE: This runs even when locked, in case the user wishes to lsiten for cancel events in order to unlock
-    // navigation.
-    if input_manager.just_pressed(ActionType::Cancel) {
-        nav_request_writer.write(NavRequest::Cancel);
+/// Tries to pass movement to the `Pressable` children of a `Focusable`. Returns `true` if the direction request was
+/// consumed by a pressable.
+fn try_consume_nav_request(
+    entity: Entity,
+    action: PressableAction,
+    query: &mut Query<(
+        &mut Focusable,
+        &FocusableOf,
+        &ComputedNode,
+        &GlobalTransform,
+        &InheritedVisibility,
+        &Pressables,
+    )>,
+    pressable_query: &mut Query<&mut Pressable>,
+    pressable_click_writer: &mut EventWriter<PressableClick>,
+) -> bool {
+    if let Ok((mut focusable, _, _, _, _, pressables)) = query.get_mut(entity) {
+        // exit early if the focusable does not consume the direction
+        if !focusable.action.matches_action(action) {
+            return false;
+        }
+
+        // mark the focusable as pressed
+        focusable.is_pressed_key = true;
+
+        // iterate over all pressables
+        for child in pressables {
+            if let Ok(mut pressable) = pressable_query.get_mut(*child) {
+                if pressable.action == action {
+                    pressable._is_pressed_focusable = true;
+                    pressable_click_writer.write(PressableClick(*child));
+                } else if pressable._is_pressed_focusable {
+                    pressable._is_pressed_focusable = false;
+                }
+            }
+        }
+
+        return true;
     }
+    false
 }
 
 /// System that handles internal `NavRequest` events.
@@ -349,111 +440,196 @@ fn handle_gamepad_input(
 fn handle_nav_requests(
     mut events: EventReader<NavRequest>,
     mut query: Query<(
-        Entity,
         &mut Focusable,
+        &FocusableOf,
         &ComputedNode,
         &GlobalTransform,
         &InheritedVisibility,
+        &Pressables,
     )>,
-    menu_query: Query<(Entity, &NavMenu)>,
-    mut cancel_writer: EventWriter<UiNavCancelEvent>,
+    mut pressable_query: Query<&mut Pressable>,
+    menu_query: Query<(Entity, &NavMenu, &Focusables)>,
     mut nav_state: ResMut<UiNavState>,
-    mut click_writer: EventWriter<UiNavClickEvent>,
-    mut focus_change_writer: EventWriter<UiNavFocusChangedEvent>,
+    mut pressable_click_writer: EventWriter<PressableClick>,
 ) {
-    let mut spatial_map = UiSpatialMap::new(&menu_query, &query.as_readonly(), &nav_state);
+    // Find the current focused entity
+    let focused = nav_state.menu.and_then(|e| {
+        if let Ok((_, _, focusables)) = menu_query.get(e) {
+            focusables
+                .iter()
+                .find(|e| query.get(*e).is_ok_and(|(f, ..)| f.is_focused))
+        } else {
+            None
+        }
+    });
 
-    let mut is_cancel: bool = false;
     for event in events.read() {
         match event {
             NavRequest::SetFocus {
                 entity,
                 interaction_type,
             } => {
-                spatial_map.set_focus(*entity, *interaction_type);
+                if let Some(focusable_entity) =
+                    try_set_focus(*entity, &query.as_readonly(), &menu_query)
+                {
+                    set_focus_to(
+                        focused,
+                        focusable_entity,
+                        &mut query,
+                        &mut pressable_query,
+                        &mut nav_state,
+                        *interaction_type == UiNavInteractionType::Mouse,
+                    );
+                }
             }
             NavRequest::Movement(direction) => {
-                spatial_map.apply_movement(*direction);
+                // Check that the current focusable does not consume these events
+                let action = match direction {
+                    UiNavDirection::Left => Some(PressableAction::Left),
+                    UiNavDirection::Right => Some(PressableAction::Right),
+                    _ => None,
+                };
+                let is_consumed = if let (Some(focused), Some(action)) = (focused, action) {
+                    try_consume_nav_request(
+                        focused,
+                        action,
+                        &mut query,
+                        &mut pressable_query,
+                        &mut pressable_click_writer,
+                    )
+                } else {
+                    false
+                };
+
+                if is_consumed {
+                    continue;
+                }
+
+                if let Some(menu_entity) = nav_state.menu {
+                    if let Ok((_, menu, focusables)) = menu_query.get(menu_entity) {
+                        let siblings: Vec<Entity> = focusables.iter().collect();
+                        let result = resolve_2d(
+                            focused,
+                            *direction,
+                            menu.is_wrap,
+                            &siblings,
+                            &query.as_readonly(),
+                        );
+                        if let Some(entity) = result {
+                            set_focus_to(
+                                focused,
+                                entity,
+                                &mut query,
+                                &mut pressable_query,
+                                &mut nav_state,
+                                false,
+                            );
+                        }
+                    } else {
+                        warn!("Current menu not found");
+                    }
+                } else {
+                    warn!("No current menu");
+                }
+            }
+            NavRequest::MovementReleased => {
+                if let Some(focused) = focused {
+                    if let Ok((mut focusable, _, _, _, _, pressables)) = query.get_mut(focused) {
+                        if focusable.action == FocusableAction::PressXY && focusable.is_pressed_key
+                        {
+                            focusable.is_pressed_key = false;
+                            for pressable in pressables.iter() {
+                                if let Ok(mut pressable) = pressable_query.get_mut(pressable) {
+                                    pressable._is_pressed_focusable = false;
+                                }
+                            }
+                        }
+                    }
+                }
             }
             NavRequest::ActionPress => {
-                spatial_map.press();
+                if let Some(focused) = focused {
+                    try_consume_nav_request(
+                        focused,
+                        PressableAction::Press,
+                        &mut query,
+                        &mut pressable_query,
+                        &mut pressable_click_writer,
+                    );
+                }
             }
             NavRequest::ActionRelease => {
-                spatial_map.release();
+                if let Some(focused) = focused {
+                    if let Ok((mut focusable, _, _, _, _, pressables)) = query.get_mut(focused) {
+                        if focusable.action == FocusableAction::Press && focusable.is_pressed_key {
+                            focusable.is_pressed_key = false;
+                            for pressable in pressables.iter() {
+                                if let Ok(mut pressable) = pressable_query.get_mut(pressable) {
+                                    pressable._is_pressed_focusable = false;
+                                }
+                            }
+                        }
+                    }
+                }
             }
             NavRequest::Cancel => {
-                is_cancel = true;
+                // is_cancel = true;
             }
             NavRequest::Lock => {
-                spatial_map.lock();
+                // spatial_map.lock();
             }
             NavRequest::Unlock => {
-                spatial_map.unlock();
+                // spatial_map.unlock();
             }
             NavRequest::Refresh => (),
         }
     }
 
-    for event in spatial_map.events() {
-        match event {
-            UiSpatialMapEvent::Press(entity) => {
-                if let Ok((_, mut focusable, _, _, _)) = query.get_mut(*entity) {
-                    focusable.is_pressed_key = true;
-                }
-            }
-            UiSpatialMapEvent::Release(entity) => {
-                if let Ok((_, mut focusable, _, _, _)) = query.get_mut(*entity) {
-                    focusable.is_pressed_key = false;
-                }
-            }
-            UiSpatialMapEvent::Click(entity) => {
-                click_writer.write(UiNavClickEvent(*entity));
-            }
-        }
-    }
+    // for event in spatial_map.events() {
+    //     match event {
+    //         UiSpatialMapEvent::Press(entity) => {
+    //             if let Ok((_, mut focusable, _, _, _)) = query.get_mut(*entity) {
+    //                 focusable.is_pressed_key = true;
+    //             }
+    //         }
+    //         UiSpatialMapEvent::Click(entity) => {
+    //             click_writer.write(UiNavClickEvent(*entity));
+    //         }
+    //         UiSpatialMapEvent::Release(entity) => {
+    //             if let Ok((_, mut focusable, _, _, _)) = query.get_mut(*entity) {
+    //                 focusable.is_pressed_key = false;
+    //             }
+    //         }
+    //     }
+    // }
 
-    // Focus on new menu
-    if let Some(new_menu) = spatial_map.get_new_menu() {
-        nav_state.menu = new_menu;
-    }
+    // // Focus on new menu
+    // if let Some(new_menu) = spatial_map.get_new_menu() {
+    //     nav_state.menu = new_menu;
+    // }
 
-    // Focus on new focusable
-    if let Some((new_focusable, interaction_type)) = spatial_map.get_new_focusable() {
-        for (entity, mut focusable, _, _, _) in query.iter_mut() {
-            focusable.is_focused = Some(entity) == new_focusable;
-            if focusable.is_focused {
-                focus_change_writer.write(UiNavFocusChangedEvent {
-                    entity,
-                    interaction_type,
-                });
-            }
-        }
-    }
+    // // Focus on new focusable
+    // if let Some((new_focusable, interaction_type)) = spatial_map.get_new_focusable() {
+    //     for (entity, mut focusable, _, _, _, _) in query.iter_mut() {
+    //         focusable.is_focused = Some(entity) == new_focusable;
+    //         if focusable.is_focused {
+    //             focus_change_writer.write(UiNavFocusChangedEvent {
+    //                 entity,
+    //                 interaction_type,
+    //             });
+    //         }
+    //     }
+    // }
 
-    // Focus on new mouse-only focusable
-    if let Some(new_focusable) = spatial_map.get_new_mouse_only_focusable() {
-        for (entity, mut focusable, _, _, _) in query.iter_mut() {
-            if focusable.is_mouse_only {
-                focusable.is_focused = Some(entity) == new_focusable;
-                if focusable.is_focused {
-                    focus_change_writer.write(UiNavFocusChangedEvent {
-                        entity,
-                        interaction_type: UiNavInteractionType::Mouse,
-                    });
-                }
-            }
-        }
-    }
+    // // Handle new locked state
+    // if let Some(locked) = spatial_map.get_new_locked() {
+    //     nav_state.locked = locked
+    // }
 
-    // Handle new locked state
-    if let Some(locked) = spatial_map.get_new_locked() {
-        nav_state.locked = locked
-    }
-
-    // Handle cancel events
-    if let (false, true, Some(menu)) = (nav_state.locked, is_cancel, spatial_map.menu()) {
-        cancel_writer.write(UiNavCancelEvent(menu));
-    }
+    // // Handle cancel events
+    // if let (false, true, Some(menu)) = (nav_state.locked, is_cancel, spatial_map.menu()) {
+    //     cancel_writer.write(UiNavCancelEvent(menu));
+    // }
 }
 
 /// System that refreshes the UI navigation state whenever a focusable changes.
@@ -466,97 +642,153 @@ fn handle_focusable_changed(
     }
 }
 
-/// System that updates [`Focusable`] components when their visibility changes. This will trigger a
-/// [`NavRequest::Refresh`] next frame, which will automatically set focus to a new focusable if needed.
-#[allow(clippy::type_complexity)]
-fn update_focusable_visibility(
-    mut query: Query<
-        (&mut Focusable, &ComputedNode, &InheritedVisibility),
-        Or<(Changed<InheritedVisibility>, Changed<ComputedNode>)>,
-    >,
+// /// This system prints out all keyboard events as they come in
+// fn handle_keyboard_input_events(
+//     mut events: EventReader<KeyboardInput>,
+//     mut nav_request_writer: EventWriter<NavRequest>,
+//     input_manager: Res<UiNavInputManager>,
+// ) {
+//     if events.is_empty() {
+//         return;
+//     }
+//     for event in events.read() {
+//         for action in input_manager.input_map.iter() {
+//             if let InputMapping::Key { keycode, action } = action {
+//                 if *keycode == event.key_code {
+//                     let nav_request = match (action, event.state) {
+//                         (ActionType::Up, ButtonState::Pressed) => {
+//                             Some(NavRequest::Movement(UiNavDirection::Up))
+//                         }
+//                         (ActionType::Down, ButtonState::Pressed) => {
+//                             Some(NavRequest::Movement(UiNavDirection::Down))
+//                         }
+//                         (ActionType::Left, ButtonState::Pressed) => {
+//                             Some(NavRequest::Movement(UiNavDirection::Left))
+//                         }
+//                         (ActionType::Right, ButtonState::Pressed) => {
+//                             Some(NavRequest::Movement(UiNavDirection::Right))
+//                         }
+//                         // NOTE: we do not handle `ActionType::Action` or `ActionType::Cancel` presses here, as we
+//                         //  only want to handle those when just pressed or just released. They are handled in
+//                         //  `handle_keyboard_input_presses`.
+//                         _ => None,
+//                     };
+//                     if let Some(nav_request) = nav_request {
+//                         nav_request_writer.write(nav_request);
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
+
+// /// This system prints out all keyboard events as they come in
+// fn handle_keyboard_input_presses(
+//     keys: Res<ButtonInput<KeyCode>>,
+//     mut nav_request_writer: EventWriter<NavRequest>,
+//     input_manager: Res<UiNavInputManager>,
+// ) {
+//     for action in input_manager.input_map.iter() {
+//         if let InputMapping::Key { keycode, action } = action {
+//             let nav_request = match action {
+//                 ActionType::Action => {
+//                     if keys.just_pressed(*keycode) {
+//                         Some(NavRequest::ActionPress)
+//                     } else if keys.just_released(*keycode) {
+//                         Some(NavRequest::ActionRelease)
+//                     } else {
+//                         None
+//                     }
+//                 }
+//                 ActionType::Cancel => {
+//                     if keys.just_pressed(*keycode) {
+//                         Some(NavRequest::Cancel)
+//                     } else {
+//                         None
+//                     }
+//                 }
+//                 _ => None,
+//             };
+//             if let Some(nav_request) = nav_request {
+//                 nav_request_writer.write(nav_request);
+//             }
+//         }
+//     }
+// }
+
+/// System that initializes new `Pressable` entities by adding their relationship to their root `Focusable` entity.
+fn setup_new_pressables(
+    mut commands: Commands,
+    mut query: Query<Entity, (Added<Pressable>, Without<PressableOf>)>,
+    child_of_query: Query<&ChildOf>,
+    focusable_query: Query<(), With<Focusable>>,
 ) {
-    // NOTE: We could send a [`NavRequest::Refresh`] event to refresh focus in the same frame, but because that will
-    // cause the refresh event to happen twice, and it is only a 1 frame delay that isn't in response to a user action,
-    // I decided not to do so.
-    for (mut focusable, node, visibility) in query.iter_mut() {
-        let size = node.size();
-        let is_visible = visibility.get() && size.x > f32::EPSILON && size.y > f32::EPSILON;
-        if is_visible != focusable.is_visible {
-            focusable.is_visible = is_visible;
+    for entity in query.iter_mut() {
+        // insert the relationship if we found the root `Focusable`, otherwise log a warning
+        if let Some(parent) = find_parent(entity, &child_of_query, &focusable_query) {
+            commands.entity(entity).insert(PressableOf(parent));
+        } else {
+            warn!("A `Pressable` was added without a root `Focusable` entity.");
         }
     }
 }
 
-/// This system prints out all keyboard events as they come in
-fn handle_keyboard_input_events(
-    mut events: EventReader<KeyboardInput>,
-    mut nav_request_writer: EventWriter<NavRequest>,
-    input_manager: Res<UiNavInputManager>,
-) {
-    if events.is_empty() {
-        return;
-    }
-    for event in events.read() {
-        for action in input_manager.input_map.iter() {
-            if let InputMapping::Key { keycode, action } = action {
-                if *keycode == event.key_code {
-                    let nav_request = match (action, event.state) {
-                        (ActionType::Up, ButtonState::Pressed) => {
-                            Some(NavRequest::Movement(UiNavDirection::Up))
-                        }
-                        (ActionType::Down, ButtonState::Pressed) => {
-                            Some(NavRequest::Movement(UiNavDirection::Down))
-                        }
-                        (ActionType::Left, ButtonState::Pressed) => {
-                            Some(NavRequest::Movement(UiNavDirection::Left))
-                        }
-                        (ActionType::Right, ButtonState::Pressed) => {
-                            Some(NavRequest::Movement(UiNavDirection::Right))
-                        }
-                        // NOTE: we do not handle `ActionType::Action` or `ActionType::Cancel` presses here, as we
-                        //  only want to handle those when just pressed or just released. They are handled in
-                        //  `handle_keyboard_input_presses`.
-                        _ => None,
-                    };
-                    if let Some(nav_request) = nav_request {
-                        nav_request_writer.write(nav_request);
-                    }
-                }
-            }
+/// Utility that traverses the entity heirarchy until it finds a parent entity matching a query.
+fn find_parent<D, F>(
+    entity: Entity,
+    child_of_query: &Query<&ChildOf>,
+    parent_query: &Query<D, F>,
+) -> Option<Entity>
+where
+    D: QueryData,
+    F: QueryFilter,
+{
+    // traverse the `ChildOf` heirarchy until we find a parent `Focusable` entity
+    let mut current = entity;
+    let mut parent = None;
+    while let Ok(child_of) = child_of_query.get(current) {
+        if parent_query.contains(child_of.0) {
+            parent = Some(child_of.0);
+            break;
+        } else {
+            current = child_of.0;
         }
     }
+    parent
 }
 
-/// This system prints out all keyboard events as they come in
-fn handle_keyboard_input_presses(
-    keys: Res<ButtonInput<KeyCode>>,
+fn update_input(
+    mut input: ResMut<UiNavInputManager>,
+    mut input_reader: InputReader,
     mut nav_request_writer: EventWriter<NavRequest>,
-    input_manager: Res<UiNavInputManager>,
 ) {
-    for action in input_manager.input_map.iter() {
-        if let InputMapping::Key { keycode, action } = action {
-            let nav_request = match action {
-                ActionType::Action => {
-                    if keys.just_pressed(*keycode) {
-                        Some(NavRequest::ActionPress)
-                    } else if keys.just_released(*keycode) {
-                        Some(NavRequest::ActionRelease)
-                    } else {
-                        None
-                    }
-                }
-                ActionType::Cancel => {
-                    if keys.just_pressed(*keycode) {
-                        Some(NavRequest::Cancel)
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
-            };
-            if let Some(nav_request) = nav_request {
-                nav_request_writer.write(nav_request);
-            }
-        }
+    // Set the gamepad
+    input_reader.set_gamepad(input.gamepad);
+
+    // update the input manager
+    input.update(&input_reader);
+
+    // TODO: Send events
+    if input.just_pressed(ActionType::Action) {
+        nav_request_writer.write(NavRequest::ActionPress);
+    } else if input.just_released(ActionType::Action) {
+        nav_request_writer.write(NavRequest::ActionRelease);
+    }
+
+    if input.just_pressed(ActionType::Up) {
+        nav_request_writer.write(NavRequest::Movement(UiNavDirection::Up));
+    }
+    if input.just_pressed(ActionType::Down) {
+        nav_request_writer.write(NavRequest::Movement(UiNavDirection::Down));
+    }
+    if input.just_pressed(ActionType::Left) {
+        nav_request_writer.write(NavRequest::Movement(UiNavDirection::Left));
+    }
+    if input.just_pressed(ActionType::Right) {
+        nav_request_writer.write(NavRequest::Movement(UiNavDirection::Right));
+    }
+
+    if input.is_direction_released() {
+        nav_request_writer.write(NavRequest::MovementReleased);
     }
 }

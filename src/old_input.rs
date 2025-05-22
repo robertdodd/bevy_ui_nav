@@ -61,6 +61,7 @@ pub struct UiNavInputManager {
     pub(crate) current_state: HashMap<ActionType, bool>,
     pub(crate) previous_state: HashMap<ActionType, bool>,
     pub(crate) current_direction: Option<UiNavDirection>,
+    pub(crate) previous_direction: Option<UiNavDirection>,
     pub(crate) stick_tolerance: f32,
     pub(crate) stick_snap_tolerance: f32,
 }
@@ -82,6 +83,7 @@ impl UiNavInputManager {
             current_state: HashMap::<ActionType, bool>::new(),
             previous_state: HashMap::<ActionType, bool>::new(),
             current_direction: None,
+            previous_direction: None,
             stick_tolerance,
             stick_snap_tolerance,
         }
@@ -105,6 +107,10 @@ impl UiNavInputManager {
 
     pub fn direction(&self) -> Option<UiNavDirection> {
         self.current_direction
+    }
+
+    pub fn is_direction_released(&self) -> bool {
+        self.previous_direction.is_some() && self.current_direction.is_none()
     }
 
     #[allow(dead_code)]
@@ -161,6 +167,9 @@ pub fn update_input_manager(
 ) {
     // update the previous state, and clear current state
     input.previous_state.clone_from(&input.current_state);
+    input
+        .previous_direction
+        .clone_from(&input.current_direction);
     for v in input.current_state.values_mut() {
         *v = false;
     }

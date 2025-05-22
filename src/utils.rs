@@ -1,10 +1,5 @@
 use bevy::{math::bounding::Aabb2d, prelude::*};
 
-/// Utility that performs linear interpolation between `a` and `b` by the value of `d`.
-pub fn f32_lerp(a: f32, b: f32, d: f32) -> f32 {
-    a * (1.0 - d) + (b * d)
-}
-
 pub fn f32_equal(a: f32, b: f32) -> bool {
     (b - a).abs() < 0.0001
 }
@@ -50,13 +45,6 @@ fn compute_overlap(min_a: f32, max_a: f32, min_b: f32, max_b: f32) -> f32 {
 mod tests {
 
     use super::*;
-
-    #[test]
-    fn f32_lerp_works() {
-        assert_relative_eq!(f32_lerp(0.0, 1.0, 0.5), 0.5);
-        assert_relative_eq!(f32_lerp(1.0, 0.0, 0.5), 0.5);
-        assert_relative_eq!(f32_lerp(-2.0, -1.0, 0.5), -1.5);
-    }
 
     #[test]
     fn f32_equal_works() {

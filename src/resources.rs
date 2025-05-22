@@ -11,9 +11,12 @@ pub struct UiNavSet;
 /// Resource holding the global menu navigation state.
 #[derive(Resource, Default, Debug)]
 pub(crate) struct UiNavState {
+    /// Whether navigation state is locked
     pub locked: bool,
     /// The current active `Menu`
     pub menu: Option<Entity>,
+    /// The last interacted with `Focusable`
+    pub last_focusable: Option<Entity>,
     /// The current direction being pressed
     pub direction: Option<UiNavDirection>,
     /// Timer for navigating based on key holds

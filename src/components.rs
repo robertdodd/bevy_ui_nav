@@ -1,6 +1,132 @@
+use core::slice;
+
 use bevy::prelude::*;
 
 use crate::types::*;
+
+/// Defines what inputs on a `Focusable` a pressable responds to.
+#[derive(Default, Debug, PartialEq, Eq, Hash, Copy, Clone)]
+pub enum PressableAction {
+    #[default]
+    Press,
+    Left,
+    Right,
+    Up,
+    Down,
+}
+
+impl PressableAction {
+    pub fn matches_direction(&self, direction: UiNavDirection) -> bool {
+        matches!(
+            (*self, direction),
+            (PressableAction::Left, UiNavDirection::Left)
+                | (PressableAction::Right, UiNavDirection::Right)
+                | (PressableAction::Up, UiNavDirection::Up)
+                | (PressableAction::Down, UiNavDirection::Down)
+        )
+    }
+}
+
+/// Component marking a pressable button inside a focusable.
+#[derive(Component, Default, Debug, Clone)]
+#[require(Node, Interaction)]
+pub struct Pressable {
+    pub action: PressableAction,
+    pub _is_pressed_interaction: bool,
+    pub _is_pressed_focusable: bool,
+    pub _is_hover_interaction: bool,
+    pub _is_hover_focusable: bool,
+}
+
+impl Pressable {
+    pub fn is_pressed(&self) -> bool {
+        self._is_pressed_interaction || self._is_pressed_focusable
+    }
+
+    pub fn is_hovered(&self) -> bool {
+        self._is_hover_interaction || self._is_hover_focusable
+    }
+
+    pub fn state(&self) -> PressableState {
+        if self.is_pressed() {
+            PressableState::Pressed
+        } else if self.is_hovered() {
+            PressableState::Hovered
+        } else {
+            PressableState::None
+        }
+    }
+
+    pub fn new_press() -> Self {
+        Self {
+            action: PressableAction::Press,
+            ..default()
+        }
+    }
+    pub fn new_left() -> Self {
+        Self {
+            action: PressableAction::Left,
+            ..default()
+        }
+    }
+    pub fn new_right() -> Self {
+        Self {
+            action: PressableAction::Right,
+            ..default()
+        }
+    }
+}
+
+/// Component marking a pressable button inside a focusable.
+#[derive(Default, Debug, PartialEq, Eq, Hash, Copy, Clone)]
+pub enum PressableState {
+    #[default]
+    None,
+    Hovered,
+    Pressed,
+}
+
+/// Component added to `Pressable` entities with a reference to their parent `Focusable`.
+#[derive(Component, Debug)]
+#[relationship(relationship_target = Pressables)]
+pub struct PressableOf(pub Entity);
+
+/// Component added to `Focusable` entities containing their child `Pressables`s.
+#[derive(Component, Debug)]
+#[relationship_target(relationship = PressableOf)]
+pub struct Pressables(Vec<Entity>);
+
+impl<'a> IntoIterator for &'a Pressables {
+    type Item = <Self::IntoIter as Iterator>::Item;
+
+    type IntoIter = slice::Iter<'a, Entity>;
+
+    #[inline(always)]
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+/// Component added to `Focusable` entities with a reference to their parent `NavMenu`.
+#[derive(Component, Debug)]
+#[relationship(relationship_target = Focusables)]
+pub struct FocusableOf(pub Entity);
+
+/// Component added to `NavMenu` entities containing their child `Focusable`s.
+#[derive(Component, Debug)]
+#[relationship_target(relationship = FocusableOf)]
+pub struct Focusables(Vec<Entity>);
+
+impl<'a> IntoIterator for &'a Focusables {
+    type Item = <Self::IntoIter as Iterator>::Item;
+
+    type IntoIter = slice::Iter<'a, Entity>;
+
+    #[inline(always)]
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
 
 /// Component defining a menu that contains `Focusable` entities.
 #[derive(Component, Debug, Clone, Reflect)]
@@ -55,31 +181,50 @@ impl NavMenu {
     }
 }
 
+#[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash, Reflect)]
+#[reflect(Default, Debug, PartialEq, Hash)]
+pub enum FocusableAction {
+    #[default]
+    Press,
+    PressXY,
+}
+
+impl FocusableAction {
+    pub fn matches_direction(&self, direction: UiNavDirection) -> bool {
+        matches!(
+            (*self, direction),
+            (FocusableAction::PressXY, UiNavDirection::Left)
+                | (FocusableAction::PressXY, UiNavDirection::Right)
+        )
+    }
+
+    pub fn matches_action(&self, action: PressableAction) -> bool {
+        matches!(
+            (*self, action),
+            (FocusableAction::PressXY, PressableAction::Left)
+                | (FocusableAction::PressXY, PressableAction::Right)
+                | (FocusableAction::Press, PressableAction::Press)
+        )
+    }
+}
+
 /// Component which marks a node as focusable.
 #[derive(Component, Default, Debug, Clone, Reflect)]
 #[reflect(Component, Default, Debug)]
+#[require(Node)]
 pub struct Focusable {
-    /// The parent `NavMenu` entity this focusable belongs to
-    pub(crate) menu: Option<Entity>,
-    /// When true, focus will be given to this entity when it is spawned
-    pub(crate) is_priority: bool,
-    /// Whether pressed via interaction
-    pub(crate) is_pressed_interaction: bool,
-    /// Whether the interaction press occurred while the focusable was active
-    pub(crate) is_pressed_interaction_from_active: bool,
+    /// What actions the focusable responds to
+    pub action: FocusableAction,
     /// Whether pressed via key press
     pub(crate) is_pressed_key: bool,
+    /// When true, focus will be given to this entity when it is spawned
+    pub(crate) is_priority: bool,
     /// Whether hovered by interaction
     pub(crate) is_hovered_interaction: bool,
     /// Whether the button is disabled, which blocks focus and click events
     pub(crate) is_disabled: bool,
     /// Whether the button is focused
     pub(crate) is_focused: bool,
-    /// Whether the button can only be pressed via the mouse. If `true`, focusing on this button will not remove focus
-    /// from other buttons.
-    pub is_mouse_only: bool,
-    /// Whether the button is visible
-    pub is_visible: bool,
 }
 
 impl Focusable {
@@ -91,6 +236,12 @@ impl Focusable {
         }
     }
 
+    /// Sets the `action` value and returns the `Focusable`
+    pub fn with_action(mut self, action: FocusableAction) -> Self {
+        self.action = action;
+        self
+    }
+
     /// Sets the `disabled` value to true and returns the `Focusable`
     pub fn disabled(mut self) -> Self {
         self.is_disabled = true;
@@ -100,12 +251,6 @@ impl Focusable {
     /// Sets the `disabled` value and returns the `Focusable`.
     pub fn with_disabled(mut self, disabled: bool) -> Self {
         self.is_disabled = disabled;
-        self
-    }
-
-    /// Sets the `is_mouse_only` value and returns the `Focusable`.
-    pub fn with_mouse_only(mut self, mouse_only: bool) -> Self {
-        self.is_mouse_only = mouse_only;
         self
     }
 
@@ -134,9 +279,7 @@ impl Focusable {
 
     /// Returns whether a focusable is pressed.
     pub fn is_pressed(&self) -> bool {
-        self.active()
-            && (self.is_pressed_key
-                || (self.is_pressed_interaction && self.is_pressed_interaction_from_active))
+        self.active() && self.is_pressed_key
     }
 
     /// Returns whether a focusable is hovered.
