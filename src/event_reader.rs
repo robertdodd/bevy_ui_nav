@@ -10,9 +10,9 @@ pub trait UiNavEvent {
     fn entity(&self) -> Entity;
 }
 
-impl UiNavEvent for UiNavClickEvent {
+impl UiNavEvent for PressEvent {
     fn entity(&self) -> Entity {
-        self.0
+        self.entity
     }
 }
 

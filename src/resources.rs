@@ -1,6 +1,4 @@
-use bevy::{prelude::*, time::Stopwatch};
-
-use crate::types::UiNavDirection;
+use bevy::prelude::*;
 
 /// System set in which the UI navigation systems run.
 ///
@@ -11,24 +9,10 @@ pub struct UiNavSet;
 /// Resource holding the global menu navigation state.
 #[derive(Resource, Default, Debug)]
 pub(crate) struct UiNavState {
+    /// Whether navigation state is locked
     pub locked: bool,
     /// The current active `Menu`
     pub menu: Option<Entity>,
-    /// The current direction being pressed
-    pub direction: Option<UiNavDirection>,
-    /// Timer for navigating based on key holds
-    pub nav_timer: Stopwatch,
-    /// Timer for tracking the total time the direction keys have been pressed for. This is used to increase hold
-    /// navigation speed when held for longer.
-    pub hold_timer: Stopwatch,
-}
-
-impl UiNavState {
-    pub fn clear_direction(&mut self) {
-        self.direction = None;
-        self.nav_timer.reset();
-        self.hold_timer.reset();
-    }
 }
 
 /// Resource containing settings for how the UI Navigation plugin behaves.

@@ -28,14 +28,13 @@ pub enum PressType {
 pub enum FocusState {
     #[default]
     None, // not focused
-    Focus,      // focused
-    FocusPress, // active and pressed
-    Disabled,   // disabled
+    Focused,  // focused
+    Disabled, // disabled
 }
 
 impl FocusState {
     pub fn active(&self) -> bool {
-        matches!(*self, FocusState::Focus | FocusState::FocusPress)
+        matches!(*self, FocusState::Focused)
     }
 }
 

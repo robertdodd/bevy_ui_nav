@@ -1,26 +1,24 @@
-use bevy::{app::AppExit, prelude::*};
+use bevy::{
+    app::AppExit,
+    color::palettes::tailwind,
+    prelude::{Val::*, *},
+};
 use bevy_ui_nav::prelude::*;
-
-use example_utils::*;
-
-mod example_utils;
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, BevyUiNavPlugin, ExampleUtilsPlugin))
+        .add_plugins((DefaultPlugins, BevyUiNavPlugin))
         .init_state::<AppState>()
         .enable_state_scoped_entities::<AppState>()
-        .init_state::<PlayState>()
-        .enable_state_scoped_entities::<PlayState>()
         .add_systems(Startup, startup)
-        .add_systems(OnEnter(AppState::Menu), on_enter_menu)
-        .add_systems(OnEnter(AppState::Play), on_enter_play)
-        .add_systems(OnEnter(AppState::Menu), setup_main_menu)
-        .add_systems(OnEnter(PlayState::Pause), setup_pause_menu)
+        .add_systems(OnEnter(AppState::Menu), spawn_main_menu)
+        .add_systems(OnEnter(AppState::Play), spawn_play_menu)
         .add_systems(
             Update,
-            handle_click_events
-                .run_if(on_event::<UiNavClickEvent>)
+            (
+                handle_click_events.run_if(on_event::<PressEvent>),
+                focusable_colors,
+            )
                 .after(UiNavSet),
         )
         .run();
@@ -33,13 +31,6 @@ pub enum AppState {
     Play,
 }
 
-#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
-pub enum PlayState {
-    #[default]
-    None,
-    Pause,
-}
-
 #[derive(Component, PartialEq, Eq, Clone, Debug)]
 enum ButtonAction {
     Play,
@@ -48,55 +39,100 @@ enum ButtonAction {
     Quit,
 }
 
+fn ui_root() -> impl Bundle + use<> {
+    (
+        Name::new("UI Root"),
+        Node {
+            width: Val::Percent(100.),
+            height: Val::Percent(100.),
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            ..default()
+        },
+        BackgroundColor(tailwind::SLATE_800.into()),
+    )
+}
+
+fn menu(focused: bool) -> impl Bundle + use<> {
+    (
+        Name::new("Menu"),
+        NavMenu::default().with_priority(focused),
+        Node {
+            flex_direction: FlexDirection::Column,
+            row_gap: Px(10.),
+            width: Px(400.),
+            padding: UiRect::all(Px(20.)),
+            border: UiRect::all(Px(2.)),
+            ..default()
+        },
+        BackgroundColor(tailwind::SLATE_700.into()),
+        BorderRadius::all(Px(20.)),
+    )
+}
+
+fn button(text: &str) -> impl Bundle + use<> {
+    (
+        Name::new("Button"),
+        Button,
+        Node {
+            width: Percent(100.),
+            border: UiRect::all(Px(4.)),
+            padding: UiRect::all(Px(20.)),
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            ..default()
+        },
+        BorderColor(Color::WHITE),
+        children![Text::new(text)],
+    )
+}
+
 fn startup(mut commands: Commands) {
     commands.spawn(Camera2d);
 }
 
-fn on_enter_menu(mut next_play_state: ResMut<NextState<PlayState>>) {
-    next_play_state.set(PlayState::None);
+fn spawn_main_menu(mut commands: Commands) {
+    commands.spawn((
+        ui_root(),
+        StateScoped(AppState::Menu),
+        children![(
+            menu(true),
+            children![
+                Text::new("Main Menu"),
+                (button("Play"), Focusable::prioritized(), ButtonAction::Play),
+                (
+                    button("Settings"),
+                    Focusable::default(),
+                    ButtonAction::Debug("Settings".to_string())
+                ),
+                (button("Quit"), Focusable::default(), ButtonAction::Quit),
+            ]
+        )],
+    ));
 }
 
-fn on_enter_play(mut next_play_state: ResMut<NextState<PlayState>>) {
-    next_play_state.set(PlayState::Pause);
-}
-
-fn setup_main_menu(mut commands: Commands) {
-    root_full_screen_centered(&mut commands, StateScoped(AppState::Menu), |p| {
-        spawn_menu(true, false, p, ()).with_children(|p| {
-            menu_title(p, "Main Menu");
-            menu_button(p, "Play", true, false, false, ButtonAction::Play);
-            menu_button(
-                p,
-                "Settings",
-                false,
-                false,
-                false,
-                ButtonAction::Debug("Settings".to_string()),
-            );
-            menu_button(p, "Quit", false, false, false, ButtonAction::Quit);
-        });
-    });
-}
-
-fn setup_pause_menu(mut commands: Commands) {
-    root_full_screen_centered(&mut commands, StateScoped(PlayState::Pause), |p| {
-        spawn_menu(true, false, p, ()).with_children(|p| {
-            menu_title(p, "Pause");
-            menu_button(
-                p,
-                "Debug",
-                true,
-                false,
-                false,
-                ButtonAction::Debug("Pause menu debug".to_string()),
-            );
-            menu_button(p, "Exit to Menu", false, false, false, ButtonAction::Menu);
-        });
-    });
+fn spawn_play_menu(mut commands: Commands) {
+    commands.spawn((
+        ui_root(),
+        StateScoped(AppState::Play),
+        children![(
+            menu(true),
+            children![
+                Text::new("Play Menu"),
+                (
+                    button("Debug"),
+                    Focusable::prioritized(),
+                    ButtonAction::Debug("Pause debug".to_string())
+                ),
+                (button("Exit"), Focusable::default(), ButtonAction::Menu),
+            ]
+        )],
+    ));
 }
 
 fn handle_click_events(
-    mut events: EventReader<UiNavClickEvent>,
+    mut events: EventReader<PressEvent>,
     query: Query<&ButtonAction, With<Focusable>>,
     mut app_exit_writer: EventWriter<AppExit>,
     mut next_app_state: ResMut<NextState<AppState>>,
@@ -114,6 +150,16 @@ fn handle_click_events(
             ButtonAction::Quit => {
                 app_exit_writer.write(AppExit::Success);
             }
+        };
+    }
+}
+
+fn focusable_colors(mut query: Query<(&Focusable, &mut BorderColor), Changed<Focusable>>) {
+    for (focusable, mut border_color) in query.iter_mut() {
+        border_color.0 = match focusable.state() {
+            FocusState::None => Color::WHITE,
+            FocusState::Focused => tailwind::YELLOW_300.into(),
+            FocusState::Disabled => Color::WHITE.with_alpha(0.25),
         };
     }
 }

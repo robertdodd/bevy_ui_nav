@@ -1,12 +1,11 @@
 mod components;
-mod default_input_map;
 mod event_reader;
 mod events;
-mod focus_node;
 mod input;
 mod plugin;
+mod queries;
+mod resolve;
 mod resources;
-mod spatial_map;
 mod types;
 mod utils;
 

@@ -1,22 +1,17 @@
 use bevy::{
     app::AppExit,
-    color::palettes::css,
-    ecs::relationship::RelatedSpawnerCommands,
+    color::palettes::tailwind,
     input::{
         keyboard::{Key, KeyboardInput},
         ButtonState,
     },
-    prelude::*,
+    prelude::{Val::*, *},
 };
 use bevy_ui_nav::prelude::*;
 
-use example_utils::*;
-
-mod example_utils;
-
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, BevyUiNavPlugin, ExampleUtilsPlugin))
+        .add_plugins((DefaultPlugins, BevyUiNavPlugin))
         .init_resource::<GameData>()
         .add_systems(Startup, startup)
         .add_systems(
@@ -25,22 +20,32 @@ fn main() {
                 text_control_style,
                 debug_cancel_events.run_if(on_event::<UiNavCancelEvent>),
                 (handle_button_click_events, handle_text_control_click_events)
-                    .run_if(on_event::<UiNavClickEvent>),
-                listen_received_character_events.run_if(on_event::<KeyboardInput>),
+                    .run_if(on_event::<PressEvent>),
                 update_text_on_change,
                 update_title_label.run_if(resource_changed::<GameData>),
+                focusable_colors,
             )
                 .after(UiNavSet),
+        )
+        // listen for keyboard input BEFORE `UiNavSet` so there is no overlap in handling key presses.
+        // for example: <Enter> locks navigation, but also detected by input system which unlocks it immediately.
+        .add_systems(
+            Update,
+            listen_received_character_events
+                .run_if(on_event::<KeyboardInput>)
+                .before(UiNavSet),
         )
         .run();
 }
 
-const TEXT_CONTROL_BG_DEFAULT: Srgba = css::DARK_GRAY;
-const TEXT_CONTROL_BG_ACTIVE: Srgba = css::WHITE;
+const TEXT_CONTROL_FONT_COLOR: Color = Color::WHITE;
 
-const TEXT_CONTROL_BORDER_DEFAULT: Srgba = css::WHITE;
-const TEXT_CONTROL_BORDER_ACTIVE: Srgba = css::RED;
-const TEXT_CONTROL_BORDER_HOVER: Srgba = css::YELLOW;
+const TEXT_CONTROL_BG_DEFAULT: Srgba = tailwind::ZINC_700;
+const TEXT_CONTROL_BG_ACTIVE: Srgba = tailwind::ZINC_800;
+
+const TEXT_CONTROL_BORDER_DEFAULT: Srgba = Srgba::new(1., 1., 1., 0.25);
+const TEXT_CONTROL_BORDER_ACTIVE: Srgba = tailwind::YELLOW_300;
+const TEXT_CONTROL_BORDER_HOVER: Srgba = tailwind::YELLOW_300;
 
 #[derive(Resource, Debug, Default)]
 struct GameData {
@@ -66,64 +71,98 @@ enum ButtonAction {
     Quit,
 }
 
+fn ui_root() -> impl Bundle + use<> {
+    (
+        Name::new("UI Root"),
+        Node {
+            width: Percent(100.),
+            height: Percent(100.),
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            ..default()
+        },
+        BackgroundColor(tailwind::SLATE_800.into()),
+    )
+}
+
+fn menu(focused: bool) -> impl Bundle + use<> {
+    (
+        Name::new("Menu"),
+        NavMenu::default().with_priority(focused),
+        Node {
+            flex_direction: FlexDirection::Column,
+            row_gap: Px(10.),
+            width: Px(400.),
+            padding: UiRect::all(Px(20.)),
+            border: UiRect::all(Px(2.)),
+            ..default()
+        },
+        BackgroundColor(tailwind::SLATE_700.into()),
+        BorderRadius::all(Px(20.)),
+    )
+}
+
+fn button(text: &str) -> impl Bundle + use<> {
+    (
+        Name::new("Button"),
+        Button,
+        Node {
+            width: Percent(100.),
+            border: UiRect::all(Px(4.)),
+            padding: UiRect::all(Px(20.)),
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            ..default()
+        },
+        BorderColor(Color::WHITE),
+        children![Text::new(text)],
+    )
+}
+
 /// Utility that spawns a text control.
-fn spawn_text_control(
-    parent: &mut RelatedSpawnerCommands<ChildOf>,
-    text: impl Into<String>,
-    focus: bool,
-    extras: impl Bundle,
-) -> Entity {
-    parent
-        .spawn((
-            if focus {
-                Focusable::prioritized()
-            } else {
-                Focusable::default()
-            },
-            Node {
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                width: Val::Px(200.),
-                height: Val::Px(50.),
-                margin: UiRect::bottom(Val::Px(10.)),
-                border: UiRect::all(Val::Px(1.)),
-                ..default()
-            },
-            BackgroundColor(TEXT_CONTROL_BG_DEFAULT.into()),
-            BorderColor(TEXT_CONTROL_BORDER_DEFAULT.into()),
-            Interaction::default(),
-            TextControl::default(),
-            TextControlStatus::InActive,
-            extras,
-        ))
-        .with_children(|p| {
-            p.spawn((
-                Text::new(text),
-                TextColor(Color::BLACK),
-                TextFont::from_font_size(20.),
-            ));
-        })
-        .id()
+fn text_input() -> impl Bundle + use<> {
+    (
+        Node {
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            width: Percent(100.),
+            height: Px(50.),
+            margin: UiRect::bottom(Px(10.)),
+            border: UiRect::all(Px(4.)),
+            ..default()
+        },
+        BackgroundColor(TEXT_CONTROL_BG_DEFAULT.into()),
+        BorderColor(TEXT_CONTROL_BORDER_DEFAULT.into()),
+        Interaction::default(),
+        TextControl::default(),
+        TextControlStatus::InActive,
+        children![(
+            Text::default(),
+            TextColor(TEXT_CONTROL_FONT_COLOR),
+            TextFont::from_font_size(20.),
+        )],
+    )
 }
 
 fn startup(mut commands: Commands) {
     commands.spawn(Camera2d);
 
-    root_full_screen_centered(&mut commands, (), |p| {
-        spawn_menu(true, false, p, ()).with_children(|p| {
-            // title
-            p.spawn(Text::new("Name: ")).with_children(|p| {
-                p.spawn((TitleLabel, TextSpan::new("")));
-            });
-
-            // text control
-            spawn_text_control(p, "", true, ());
-
-            // Save and cancel buttons
-            menu_button(p, "Reset", false, false, false, ButtonAction::Reset);
-            menu_button(p, "Quit", false, false, false, ButtonAction::Quit);
-        });
-    });
+    commands.spawn((
+        ui_root(),
+        children![(
+            menu(true),
+            children![
+                (
+                    Text::new("Name: "),
+                    children![(TitleLabel, TextSpan::default())],
+                ),
+                (text_input(), Focusable::prioritized()),
+                (button("Reset"), Focusable::default(), ButtonAction::Reset),
+                (button("Quit"), Focusable::default(), ButtonAction::Quit),
+            ]
+        )],
+    ));
 }
 
 /// System that updates the style of text controls when their focus state changes
@@ -140,35 +179,30 @@ fn text_control_style(
     >,
 ) {
     for (focusable, mut bg, mut border, status) in query.iter_mut() {
-        // Update background color
         *bg = if *status == TextControlStatus::Active {
             TEXT_CONTROL_BG_ACTIVE
         } else {
             TEXT_CONTROL_BG_DEFAULT
         }
         .into();
-
-        // Update border color
-        *border = if *status == TextControlStatus::Active {
-            TEXT_CONTROL_BORDER_ACTIVE
-        } else if focusable.is_hovered() || focusable.state().active() {
-            TEXT_CONTROL_BORDER_HOVER
-        } else {
-            TEXT_CONTROL_BORDER_DEFAULT
+        *border = match (status, focusable.state()) {
+            (TextControlStatus::Active, _) => TEXT_CONTROL_BORDER_ACTIVE,
+            (TextControlStatus::InActive, FocusState::Focused) => TEXT_CONTROL_BORDER_HOVER,
+            _ => TEXT_CONTROL_BORDER_DEFAULT,
         }
         .into();
     }
 }
 
 fn handle_button_click_events(
-    mut events: EventReader<UiNavClickEvent>,
+    mut events: EventReader<PressEvent>,
     query: Query<&ButtonAction, (With<Focusable>, With<Button>)>,
     mut app_exit_writer: EventWriter<AppExit>,
     mut game_data: ResMut<GameData>,
     mut text_control_query: Query<&mut TextControl>,
 ) {
     for event in events.read() {
-        if let Ok(button_action) = query.get(event.0) {
+        if let Ok(button_action) = query.get(event.entity) {
             println!("ClickEvent: {:?}", button_action);
             match *button_action {
                 ButtonAction::Quit => {
@@ -187,12 +221,12 @@ fn handle_button_click_events(
 
 /// System that handles click events on a text control
 fn handle_text_control_click_events(
-    mut events: EventReader<UiNavClickEvent>,
+    mut events: EventReader<PressEvent>,
     mut query: Query<&mut TextControlStatus>,
     mut nav_request_writer: EventWriter<NavRequest>,
 ) {
     for event in events.read() {
-        if let Ok(mut status) = query.get_mut(event.0) {
+        if let Ok(mut status) = query.get_mut(event.entity) {
             match *status {
                 TextControlStatus::InActive => {
                     *status = TextControlStatus::Active;
@@ -255,10 +289,7 @@ fn listen_received_character_events(
                                 .find(|(_, action)| matches!(action, ButtonAction::Reset))
                                 .map(|(e, _)| e)
                             {
-                                nav_request_writer.write(NavRequest::SetFocus {
-                                    entity: submit_button,
-                                    interaction_type: UiNavInteractionType::Manual,
-                                });
+                                nav_request_writer.write(NavRequest::SetFocus(submit_button));
                             }
                             true
                         }
@@ -309,5 +340,17 @@ fn update_text_on_change(
 fn debug_cancel_events(mut events: EventReader<UiNavCancelEvent>) {
     for event in events.read() {
         println!("{event:?}");
+    }
+}
+
+fn focusable_colors(
+    mut query: Query<(&Focusable, &mut BorderColor), (Changed<Focusable>, With<Button>)>,
+) {
+    for (focusable, mut border_color) in query.iter_mut() {
+        border_color.0 = match focusable.state() {
+            FocusState::None => Color::WHITE,
+            FocusState::Focused => tailwind::YELLOW_300.into(),
+            FocusState::Disabled => Color::WHITE.with_alpha(0.25),
+        };
     }
 }

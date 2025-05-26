@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::types::*;
+use crate::{prelude::PressableAction, types::*};
 
 /// Event sent when a new focusable is focused.
 ///
@@ -25,7 +25,10 @@ pub struct UiNavCancelEvent(pub Entity);
 /// This event is sent by this plugin and should be handled by the user.
 #[derive(Event, Debug, PartialEq, Reflect, Hash)]
 #[reflect(Debug, PartialEq, Hash)]
-pub struct UiNavClickEvent(pub Entity);
+pub struct PressEvent {
+    pub entity: Entity,
+    pub action: PressableAction,
+}
 
 /// Event used internally to trigger a UI navigation request.
 ///
@@ -34,16 +37,11 @@ pub struct UiNavClickEvent(pub Entity);
 #[reflect(Debug, PartialEq, Hash)]
 pub enum NavRequest {
     /// Set focus on a `Focusable`
-    SetFocus {
-        entity: Entity,
-        interaction_type: UiNavInteractionType,
-    },
+    SetFocus(Entity),
     /// Move focus in a specific direction
     Movement(UiNavDirection),
     /// Press the action key
     ActionPress,
-    /// Release the action key
-    ActionRelease,
     /// Cancel key pressed for first time
     Cancel,
     /// Refresh focus state if menus have changed

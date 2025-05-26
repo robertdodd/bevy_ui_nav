@@ -1,200 +1,187 @@
-use bevy::{app::AppExit, prelude::*};
+//! This example demonstrates navigating between multiple `NavMenus` on the screen.
+
+use bevy::{
+    app::AppExit,
+    color::palettes::tailwind,
+    prelude::{Val::*, *},
+};
 use bevy_ui_nav::prelude::*;
-
-use example_utils::*;
-
-mod example_utils;
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, BevyUiNavPlugin, ExampleUtilsPlugin))
+        .add_plugins((DefaultPlugins, BevyUiNavPlugin))
         .add_systems(Startup, startup)
         .add_systems(
             Update,
             (
-                handle_click_events.run_if(on_event::<UiNavClickEvent>),
+                handle_click_events.run_if(on_event::<PressEvent>),
                 handle_cancel_events.run_if(on_event::<UiNavCancelEvent>),
+                focusable_colors,
             )
                 .after(UiNavSet),
         )
         .run();
 }
 
-#[derive(Component)]
-struct MainMenu;
-
-#[derive(Component)]
-struct MenuParent(Entity);
+#[derive(Component, PartialEq, Eq, Clone, Debug)]
+enum Menu {
+    Main,
+    Graphics,
+    Sound,
+}
 
 #[derive(Component, PartialEq, Eq, Clone, Debug)]
 enum ButtonAction {
-    Menu(Entity),
+    Menu(Menu),
     Debug(String),
     Quit,
+}
+
+fn ui_root() -> impl Bundle + use<> {
+    (
+        Name::new("UI Root"),
+        Node {
+            width: Val::Percent(100.),
+            height: Val::Percent(100.),
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            ..default()
+        },
+        BackgroundColor(tailwind::SLATE_800.into()),
+    )
+}
+
+fn menu(focused: bool) -> impl Bundle + use<> {
+    (
+        Name::new("Menu"),
+        NavMenu::default().with_priority(focused),
+        Node {
+            flex_direction: FlexDirection::Column,
+            row_gap: Px(10.),
+            width: Px(400.),
+            padding: UiRect::all(Px(20.)),
+            border: UiRect::all(Px(2.)),
+            ..default()
+        },
+        BackgroundColor(tailwind::SLATE_700.into()),
+        BorderRadius::all(Px(20.)),
+    )
+}
+
+fn button(text: &str) -> impl Bundle + use<> {
+    (
+        Name::new("Button"),
+        Button,
+        Node {
+            width: Percent(100.),
+            border: UiRect::all(Px(4.)),
+            padding: UiRect::all(Px(20.)),
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            ..default()
+        },
+        BorderColor(Color::WHITE),
+        children![Text::new(text)],
+    )
 }
 
 fn startup(mut commands: Commands) {
     commands.spawn(Camera2d);
 
-    let mut settings_menu = None;
-    let mut graphics_menu = None;
-    let mut sound_menu = None;
-
-    // Spawn a button that can only be triggered by clicking it
-    commands
-        .spawn(Node {
-            width: Val::Percent(100.),
-            margin: UiRect::vertical(Val::Px(20.)),
-            ..default()
-        })
-        .with_children(|p| {
-            menu_button(p, "Quit", true, false, true, ButtonAction::Quit);
-        });
-
-    commands
-        .spawn(Node {
-            width: Val::Percent(100.),
-            height: Val::Percent(100.),
-            ..default()
-        })
-        .with_children(|p| {
-            // Main Menu
-            let settings_menu_entity = spawn_menu(true, false, p, MainMenu)
-                .with_children(|p| {
-                    menu_title(p, "Settings");
-                })
-                .id();
-            settings_menu = Some(settings_menu_entity);
-
-            // Graphics Menu
-            let graphics_menu_entity = spawn_menu(false, false, p, MainMenu)
-                .with_children(|p| {
-                    menu_title(p, "Graphics");
-                })
-                .id();
-            graphics_menu = Some(graphics_menu_entity);
-
-            // Sound Menu
-            let sound_menu_entity = spawn_menu(false, false, p, MainMenu)
-                .with_children(|p| {
-                    menu_title(p, "Sound");
-                })
-                .id();
-            sound_menu = Some(sound_menu_entity);
-        });
-
-    if let (Some(settings_menu), Some(graphics_menu), Some(sound_menu)) =
-        (settings_menu, graphics_menu, sound_menu)
-    {
-        // Add buttons to main settings menu
-        commands.entity(settings_menu).with_children(|p| {
-            menu_button(
-                p,
-                "Graphics",
-                true,
-                false,
-                false,
-                ButtonAction::Menu(graphics_menu),
-            );
-            menu_button(
-                p,
-                "Sound",
-                false,
-                false,
-                false,
-                ButtonAction::Menu(sound_menu),
-            );
-            menu_button(p, "Quit", false, false, false, ButtonAction::Quit);
-        });
-
-        // Add buttons to graphics settings menu
-        commands
-            .entity(graphics_menu)
-            .insert(MenuParent(settings_menu))
-            .with_children(|p| {
-                menu_button(
-                    p,
-                    "Option 1",
-                    true,
-                    false,
-                    false,
-                    ButtonAction::Debug("Graphics Option 1".to_string()),
-                );
-                menu_button(
-                    p,
-                    "Option 2",
-                    false,
-                    false,
-                    false,
-                    ButtonAction::Debug("Graphics Option 2".to_string()),
-                );
-                menu_button(
-                    p,
-                    "Cancel",
-                    false,
-                    false,
-                    false,
-                    ButtonAction::Menu(settings_menu),
-                );
-            });
-
-        // Add buttons to sound settings menu
-        commands
-            .entity(sound_menu)
-            .insert(MenuParent(settings_menu))
-            .with_children(|p| {
-                menu_button(
-                    p,
-                    "Option 1",
-                    true,
-                    false,
-                    false,
-                    ButtonAction::Debug("Sound Option 1".to_string()),
-                );
-                menu_button(
-                    p,
-                    "Option 2",
-                    false,
-                    false,
-                    false,
-                    ButtonAction::Debug("Sound Option 2".to_string()),
-                );
-                menu_button(
-                    p,
-                    "Cancel",
-                    false,
-                    false,
-                    false,
-                    ButtonAction::Menu(settings_menu),
-                );
-            });
-    }
+    commands.spawn((
+        ui_root(),
+        children![
+            (
+                menu(true),
+                Menu::Main,
+                children![
+                    Text::new("Main Menu"),
+                    (
+                        Text::new("Navigate between menus. It should return focus to the last focused item in each menu."),
+                        TextFont::from_font_size(14.),
+                    ),
+                    (
+                        button("Graphics"),
+                        ButtonAction::Menu(Menu::Graphics),
+                        Focusable::prioritized()
+                    ),
+                    (
+                        button("Sound"),
+                        ButtonAction::Menu(Menu::Sound),
+                        Focusable::default()
+                    ),
+                    (button("Quit"), ButtonAction::Quit, Focusable::default()),
+                ]
+            ),
+            (
+                menu(false),
+                Menu::Graphics,
+                children![
+                    Text::new("Graphics Menu"),
+                    (
+                        button("Option 1"),
+                        ButtonAction::Debug("Graphics Option 1".to_string()),
+                        Focusable::prioritized()
+                    ),
+                    (
+                        button("Option 2"),
+                        ButtonAction::Debug("Graphics Option 2".to_string()),
+                        Focusable::default()
+                    ),
+                    (
+                        button("Cancel"),
+                        ButtonAction::Menu(Menu::Main),
+                        Focusable::default()
+                    ),
+                ]
+            ),
+            (
+                menu(false),
+                Menu::Sound,
+                children![
+                    Text::new("Sound Menu"),
+                    (
+                        button("Option 1"),
+                        ButtonAction::Debug("Sound Option 1".to_string()),
+                        Focusable::prioritized()
+                    ),
+                    (
+                        button("Option 2"),
+                        ButtonAction::Debug("Sound Option 2".to_string()),
+                        Focusable::default()
+                    ),
+                    (
+                        button("Cancel"),
+                        ButtonAction::Menu(Menu::Main),
+                        Focusable::default()
+                    ),
+                ]
+            ),
+        ],
+    ));
 }
 
 fn handle_click_events(
-    mut events: EventReader<UiNavClickEvent>,
+    mut events: EventReader<PressEvent>,
     query: Query<&ButtonAction, With<Focusable>>,
+    menu_query: Query<(Entity, &Menu)>,
     mut app_exit_writer: EventWriter<AppExit>,
     mut nav_request_writer: EventWriter<NavRequest>,
 ) {
-    // This is equivalent to:
-    // ```
-    // for event in events.read() {
-    //     if let Ok(button_action) = query.get(event.0) {
-    //         ...
-    //     }
-    // }
-    // ```
     for button_action in events.nav_iter().in_query(&query) {
         println!("ClickEvent: {:?}", button_action);
         match button_action {
-            ButtonAction::Menu(menu) => {
-                nav_request_writer.write(NavRequest::SetFocus {
-                    entity: *menu,
-                    interaction_type: UiNavInteractionType::Manual,
-                });
+            ButtonAction::Menu(target) => {
+                let menu = menu_query
+                    .iter()
+                    .find(|(_, menu)| **menu == *target)
+                    .map(|(e, _)| e);
+                if let Some(menu) = menu {
+                    nav_request_writer.write(NavRequest::SetFocus(menu));
+                }
             }
-            ButtonAction::Debug(debug_text) => println!("clicked: {debug_text}"),
+            ButtonAction::Debug(debug_text) => println!("  clicked on \"{debug_text}\""),
             ButtonAction::Quit => {
                 app_exit_writer.write(AppExit::Success);
             }
@@ -204,16 +191,30 @@ fn handle_click_events(
 
 fn handle_cancel_events(
     mut events: EventReader<UiNavCancelEvent>,
-    query: Query<&MenuParent>,
+    menu_query: Query<(Entity, &Menu)>,
     mut nav_request_writer: EventWriter<NavRequest>,
 ) {
     for event in events.read() {
-        if let Ok(menu_parent) = query.get(event.0) {
-            println!("CancelEvent: {:?}", event);
-            nav_request_writer.write(NavRequest::SetFocus {
-                entity: menu_parent.0,
-                interaction_type: UiNavInteractionType::Manual,
-            });
+        println!("CancelEvent: {:?}", event);
+
+        // find and set focus to the main menu, unless the event was sent from the main menu.
+        let main_menu = menu_query
+            .iter()
+            .filter(|(e, _)| *e != event.0)
+            .find(|(_, menu)| **menu == Menu::Main)
+            .map(|(e, _)| e);
+        if let Some(main_menu) = main_menu {
+            nav_request_writer.write(NavRequest::SetFocus(main_menu));
         }
+    }
+}
+
+fn focusable_colors(mut query: Query<(&Focusable, &mut BorderColor), Changed<Focusable>>) {
+    for (focusable, mut border_color) in query.iter_mut() {
+        border_color.0 = match focusable.state() {
+            FocusState::None => Color::WHITE,
+            FocusState::Focused => tailwind::YELLOW_300.into(),
+            FocusState::Disabled => Color::WHITE.with_alpha(0.25),
+        };
     }
 }

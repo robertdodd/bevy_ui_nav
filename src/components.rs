@@ -1,10 +1,61 @@
+use core::slice;
+
 use bevy::prelude::*;
 
 use crate::types::*;
 
+/// Defines what inputs on a `Focusable` a pressable responds to.
+#[derive(Default, Debug, PartialEq, Eq, Hash, Copy, Clone, Reflect)]
+pub enum PressableAction {
+    #[default]
+    Press,
+    Left,
+    Right,
+    Up,
+    Down,
+}
+
+impl PressableAction {
+    pub fn matches_direction(&self, direction: UiNavDirection) -> bool {
+        matches!(
+            (*self, direction),
+            (PressableAction::Left, UiNavDirection::Left)
+                | (PressableAction::Right, UiNavDirection::Right)
+                | (PressableAction::Up, UiNavDirection::Up)
+                | (PressableAction::Down, UiNavDirection::Down)
+        )
+    }
+}
+
+/// Component added to `Focusable` entities with a reference to their parent `NavMenu`.
+#[derive(Component, Debug)]
+#[relationship(relationship_target = Focusables)]
+pub struct FocusableOf(pub Entity);
+
+/// Component added to `NavMenu` entities containing their child `Focusable`s.
+#[derive(Component, Debug)]
+#[relationship_target(relationship = FocusableOf)]
+pub struct Focusables(Vec<Entity>);
+
+impl<'a> IntoIterator for &'a Focusables {
+    type Item = <Self::IntoIter as Iterator>::Item;
+
+    type IntoIter = slice::Iter<'a, Entity>;
+
+    #[inline(always)]
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+#[derive(Component, Debug, Default, Reflect)]
+#[reflect(Component, Default, Debug)]
+pub struct LastFocusable(pub Option<Entity>);
+
 /// Component defining a menu that contains `Focusable` entities.
 #[derive(Component, Debug, Clone, Reflect)]
 #[reflect(Component, Default, Debug)]
+#[require(LastFocusable)]
 pub struct NavMenu {
     /// Whether this menu should be made active when it is spawned. Changing this value after it is spawned will not
     /// have any effect.
@@ -53,33 +104,55 @@ impl NavMenu {
         self.is_priority = true;
         self
     }
+
+    /// Sets the `is_priority` value and returns the `NavMenu`.
+    /// This will cause the menu to take focus as soon as it is spawned.
+    pub fn with_priority(mut self, is_priority: bool) -> Self {
+        self.is_priority = is_priority;
+        self
+    }
+}
+
+#[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash, Reflect)]
+#[reflect(Default, Debug, PartialEq, Hash)]
+pub enum FocusableAction {
+    #[default]
+    Press,
+    PressXY,
+}
+
+impl FocusableAction {
+    pub fn matches_direction(&self, direction: UiNavDirection) -> bool {
+        matches!(
+            (*self, direction),
+            (FocusableAction::PressXY, UiNavDirection::Left)
+                | (FocusableAction::PressXY, UiNavDirection::Right)
+        )
+    }
+
+    pub fn matches_action(&self, action: PressableAction) -> bool {
+        matches!(
+            (*self, action),
+            (FocusableAction::PressXY, PressableAction::Left)
+                | (FocusableAction::PressXY, PressableAction::Right)
+                | (FocusableAction::Press, PressableAction::Press)
+        )
+    }
 }
 
 /// Component which marks a node as focusable.
 #[derive(Component, Default, Debug, Clone, Reflect)]
 #[reflect(Component, Default, Debug)]
+#[require(Node)]
 pub struct Focusable {
-    /// The parent `NavMenu` entity this focusable belongs to
-    pub(crate) menu: Option<Entity>,
+    /// What actions the focusable responds to
+    pub action: FocusableAction,
     /// When true, focus will be given to this entity when it is spawned
     pub(crate) is_priority: bool,
-    /// Whether pressed via interaction
-    pub(crate) is_pressed_interaction: bool,
-    /// Whether the interaction press occurred while the focusable was active
-    pub(crate) is_pressed_interaction_from_active: bool,
-    /// Whether pressed via key press
-    pub(crate) is_pressed_key: bool,
-    /// Whether hovered by interaction
-    pub(crate) is_hovered_interaction: bool,
     /// Whether the button is disabled, which blocks focus and click events
     pub(crate) is_disabled: bool,
     /// Whether the button is focused
     pub(crate) is_focused: bool,
-    /// Whether the button can only be pressed via the mouse. If `true`, focusing on this button will not remove focus
-    /// from other buttons.
-    pub is_mouse_only: bool,
-    /// Whether the button is visible
-    pub is_visible: bool,
 }
 
 impl Focusable {
@@ -89,6 +162,12 @@ impl Focusable {
             is_priority: true,
             ..default()
         }
+    }
+
+    /// Sets the `action` value and returns the `Focusable`
+    pub fn with_action(mut self, action: FocusableAction) -> Self {
+        self.action = action;
+        self
     }
 
     /// Sets the `disabled` value to true and returns the `Focusable`
@@ -103,12 +182,6 @@ impl Focusable {
         self
     }
 
-    /// Sets the `is_mouse_only` value and returns the `Focusable`.
-    pub fn with_mouse_only(mut self, mouse_only: bool) -> Self {
-        self.is_mouse_only = mouse_only;
-        self
-    }
-
     /// Sets the `is_priority` value and returns the `Focusable`.
     pub fn with_priority(mut self, prioritized: bool) -> Self {
         self.is_priority = prioritized;
@@ -119,10 +192,8 @@ impl Focusable {
     pub fn state(&self) -> FocusState {
         if self.is_disabled {
             FocusState::Disabled
-        } else if self.is_pressed() {
-            FocusState::FocusPress
         } else if self.is_focused {
-            FocusState::Focus
+            FocusState::Focused
         } else {
             FocusState::None
         }
@@ -130,18 +201,6 @@ impl Focusable {
 
     pub fn active(&self) -> bool {
         !self.is_disabled && self.is_focused
-    }
-
-    /// Returns whether a focusable is pressed.
-    pub fn is_pressed(&self) -> bool {
-        self.active()
-            && (self.is_pressed_key
-                || (self.is_pressed_interaction && self.is_pressed_interaction_from_active))
-    }
-
-    /// Returns whether a focusable is hovered.
-    pub fn is_hovered(&self) -> bool {
-        self.is_hovered_interaction && !self.is_disabled
     }
 
     /// Enables a `Focusable`.
