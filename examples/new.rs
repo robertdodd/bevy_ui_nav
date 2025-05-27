@@ -1,7 +1,4 @@
-use std::time::Duration;
-
 use bevy::{
-    app::AppExit,
     color::palettes::tailwind,
     prelude::{Val::*, *},
 };
@@ -18,15 +15,11 @@ fn main() {
         .add_systems(
             Update,
             (
-                setup_new_focusables,
                 handle_click_events.run_if(on_event::<OnPressed>),
                 on_toggle_click.run_if(on_event::<OnPressed>),
                 update_screen_labels.run_if(state_changed::<Screen>),
-                handle_focusable_click_events,
                 pressable_system,
-                focusable_system,
                 debug_nav_requests,
-                update_focusable_animations,
             )
                 .after(UiNavSet),
         )
@@ -45,9 +38,6 @@ const BUTTON_BG_PRESSED: Srgba = tailwind::RED_900;
 // const BUTTON_BORDER_COLOR_NORMAL: Srgba = tailwind::RED_950;
 // const BUTTON_BORDER_COLOR_HOVERED: Srgba = tailwind::RED_950;
 // const BUTTON_BORDER_COLOR_PRESSED: Srgba = Srgba::NONE;
-
-const FOCUSABLE_OUTLINE_START: f32 = 10.;
-const FOCUSABLE_OUTLINE_END: f32 = 2.;
 
 #[derive(Component)]
 pub struct ScreenLabel;
@@ -68,7 +58,6 @@ enum MenuButton {
     Graphics,
     Sound,
     Controls,
-    Exit,
 }
 
 #[derive(Component, PartialEq, Eq, Clone, Copy, Debug)]
@@ -79,15 +68,6 @@ enum ToggleButton {
 
 #[derive(Component, Debug)]
 struct ToggleValue(i32);
-
-#[derive(Component, Debug)]
-struct FocusableAnimation(Timer);
-
-impl Default for FocusableAnimation {
-    fn default() -> Self {
-        Self(Timer::new(Duration::from_secs_f32(0.25), TimerMode::Once))
-    }
-}
 
 fn ui_root() -> impl Bundle + use<> {
     (
@@ -145,15 +125,6 @@ fn panel_header() -> impl Bundle + use<> {
         Focusable::default().with_action(FocusableAction::PressXY),
         BorderRadius::all(Px(10.)),
         FocusableNav::default(),
-    )
-}
-
-fn button_focusable() -> impl Bundle + use<> {
-    (
-        Name::new("Button - Focusable"),
-        Node::default(),
-        Focusable::default(),
-        BorderRadius::all(Px(8.)),
     )
 }
 
@@ -307,7 +278,7 @@ fn handle_click_events(
     mut events: EventReader<OnPressed>,
     query: Query<&MenuButton>,
     mut next_screen: ResMut<NextState<Screen>>,
-    mut app_exit_writer: EventWriter<AppExit>,
+    // mut app_exit_writer: EventWriter<AppExit>,
 ) {
     for event in events.read() {
         if let Ok(button) = query.get(event.0) {
@@ -321,10 +292,9 @@ fn handle_click_events(
                 }
                 MenuButton::Controls => {
                     next_screen.set(Screen::Controls);
-                }
-                MenuButton::Exit => {
-                    app_exit_writer.write(AppExit::Success);
-                }
+                } // MenuButton::Exit => {
+                  //     app_exit_writer.write(AppExit::Success);
+                  // }
             };
         }
     }
@@ -445,74 +415,8 @@ fn pressable_system(
     }
 }
 
-fn focusable_system(
-    mut commands: Commands,
-    mut query: Query<
-        (Entity, &Focusable, &mut Outline, Has<FocusableAnimation>),
-        Changed<Focusable>,
-    >,
-) {
-    for (entity, focusable, mut outline, has_animation) in query.iter_mut() {
-        let is_focused = matches!(focusable.state(), FocusState::Focused);
-        // insert an outline animation if focused and we dont have one, or whenever pressed
-        if is_focused {
-            if focusable.state() == FocusState::Focused {
-                outline.color = Color::WHITE;
-                commands
-                    .entity(entity)
-                    .insert(FocusableAnimation::default());
-            }
-        } else {
-            outline.color = Color::NONE;
-            if has_animation {
-                commands.entity(entity).remove::<FocusableAnimation>();
-            }
-        }
-    }
-}
-
 fn debug_nav_requests(mut events: EventReader<NavRequest>) {
     for event in events.read() {
         info!("NavRequest::{:?}", event);
-    }
-}
-
-fn update_focusable_animations(
-    mut commands: Commands,
-    time: Res<Time>,
-    mut query: Query<(Entity, &mut FocusableAnimation, &mut Outline), With<Focusable>>,
-) {
-    for (entity, mut animation, mut outline) in query.iter_mut() {
-        animation.0.tick(time.delta());
-        let width = FOCUSABLE_OUTLINE_START.lerp(FOCUSABLE_OUTLINE_END, animation.0.fraction());
-        outline.width = Px(width);
-        if animation.0.just_finished() {
-            commands.entity(entity).remove::<FocusableAnimation>();
-        }
-    }
-}
-
-fn handle_focusable_click_events(mut commands: Commands, mut events: EventReader<PressEvent>) {
-    for event in events.read() {
-        commands
-            .entity(event.entity)
-            .insert(FocusableAnimation::default());
-    }
-}
-
-fn setup_new_focusables(
-    mut commands: Commands,
-    query: Query<(Entity, &Focusable), (Added<Focusable>, Without<Outline>)>,
-) {
-    for (entity, focusable) in query.iter() {
-        commands.entity(entity).insert(Outline::new(
-            Px(FOCUSABLE_OUTLINE_END),
-            Val::ZERO,
-            if focusable.state() == FocusState::Focused {
-                Color::WHITE
-            } else {
-                Color::NONE
-            },
-        ));
     }
 }

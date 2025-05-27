@@ -5,13 +5,14 @@ use bevy::{
 use bevy_ui_nav::prelude::*;
 
 mod components;
+mod focusable_outline;
 mod navbar;
 
 pub use {components::*, navbar::*};
 
 pub fn plugin(app: &mut App) {
     app.add_event::<OnPressed>();
-    app.add_plugins(navbar::plugin);
+    app.add_plugins((navbar::plugin, focusable_outline::plugin));
     app.add_systems(PreUpdate, setup_new_pressables);
     app.add_systems(
         Update,
