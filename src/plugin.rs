@@ -201,8 +201,12 @@ fn handle_nav_requests(
                         );
                         if let Some(entity) = result {
                             let new_focused = queries.set_focus(focused, entity);
-                            if new_focused.is_some() {
-                                focused = new_focused;
+                            if let Some(new_focused) = new_focused {
+                                focused = Some(new_focused);
+                                focus_writer.write(UiNavFocusChangedEvent {
+                                    entity: new_focused,
+                                    interaction_type: UiNavInteractionType::Button,
+                                });
                             }
                         }
                     } else {

@@ -389,42 +389,20 @@ fn pressable_system(
                 for style in &mut box_shadow.0 {
                     style.color = Color::NONE;
                 }
-                *box_shadow = BoxShadow::new(
-                    // fmt: line break
-                    Color::NONE,
-                    Px(0.),
-                    Px(0.),
-                    Val::Percent(0.),
-                    Val::Px(BUTTON_SHADOW_BLUR),
-                );
             }
             PressableState::Hovered => {
                 node.margin = UiRect::px(0., 0., 0., BUTTON_SHADOW_OFFSET);
                 *bg = BUTTON_BG_HOVERED.into();
                 for style in &mut box_shadow.0 {
-                    style.color = Color::NONE;
+                    style.color = Color::BLACK.with_alpha(0.8);
                 }
-                *box_shadow = BoxShadow::new(
-                    Color::BLACK.with_alpha(0.8),
-                    Px(0.),
-                    Px(BUTTON_SHADOW_OFFSET),
-                    Val::Px(BUTTON_SHADOW_SPREAD),
-                    Val::Px(BUTTON_SHADOW_BLUR),
-                );
             }
             PressableState::None => {
                 node.margin = UiRect::px(0., 0., 0., BUTTON_SHADOW_OFFSET);
                 *bg = BUTTON_BG_NORMAL.into();
                 for style in &mut box_shadow.0 {
-                    style.color = Color::NONE;
+                    style.color = Color::BLACK.with_alpha(0.8);
                 }
-                *box_shadow = BoxShadow::new(
-                    Color::BLACK.with_alpha(0.8),
-                    Px(0.),
-                    Px(BUTTON_SHADOW_OFFSET),
-                    Val::Px(BUTTON_SHADOW_SPREAD),
-                    Val::Px(BUTTON_SHADOW_BLUR),
-                );
             }
         }
     }
