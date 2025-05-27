@@ -21,7 +21,6 @@ fn main() {
                 handle_click_events.run_if(on_event::<OnPressed>),
                 on_toggle_click.run_if(on_event::<OnPressed>),
                 update_screen_labels.run_if(state_changed::<Screen>),
-                // handle_pressable_click_events.run_if(on_event::<PressableClick>),
                 handle_focusable_click_events,
                 pressable_system,
                 focusable_system,
@@ -42,12 +41,9 @@ const BUTTON_BORDER_RADIUS: f32 = 8.;
 const BUTTON_BG_NORMAL: Srgba = tailwind::RED_500;
 const BUTTON_BG_HOVERED: Srgba = tailwind::RED_700;
 const BUTTON_BG_PRESSED: Srgba = tailwind::RED_900;
-const BUTTON_BORDER_COLOR_NORMAL: Srgba = tailwind::RED_950;
-const BUTTON_BORDER_COLOR_HOVERED: Srgba = tailwind::RED_950;
-const BUTTON_BORDER_COLOR_PRESSED: Srgba = Srgba::NONE;
-// const BUTTON_BORDER_NORMAL: UiRect = UiRect::bottom(Val::Px(BUTTON_BORDER));
-// const BUTTON_BORDER_HOVERED: UiRect = UiRect::bottom(Val::Px(BUTTON_BORDER));
-// const BUTTON_BORDER_PRESSED: UiRect = UiRect::top(Val::Px(BUTTON_BORDER));
+// const BUTTON_BORDER_COLOR_NORMAL: Srgba = tailwind::RED_950;
+// const BUTTON_BORDER_COLOR_HOVERED: Srgba = tailwind::RED_950;
+// const BUTTON_BORDER_COLOR_PRESSED: Srgba = Srgba::NONE;
 
 const FOCUSABLE_OUTLINE_START: f32 = 10.;
 const FOCUSABLE_OUTLINE_END: f32 = 2.;
