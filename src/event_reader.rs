@@ -10,7 +10,7 @@ pub trait UiNavEvent {
     fn entity(&self) -> Entity;
 }
 
-impl UiNavEvent for PressEvent {
+impl UiNavEvent for FocusablePressed {
     fn entity(&self) -> Entity {
         self.entity
     }

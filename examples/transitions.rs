@@ -16,7 +16,7 @@ fn main() {
         .add_systems(
             Update,
             (
-                handle_click_events.run_if(on_event::<PressEvent>),
+                handle_click_events.run_if(on_event::<FocusablePressed>),
                 focusable_colors,
             )
                 .after(UiNavSet),
@@ -132,7 +132,7 @@ fn spawn_play_menu(mut commands: Commands) {
 }
 
 fn handle_click_events(
-    mut events: EventReader<PressEvent>,
+    mut events: EventReader<FocusablePressed>,
     query: Query<&ButtonAction, With<Focusable>>,
     mut app_exit_writer: EventWriter<AppExit>,
     mut next_app_state: ResMut<NextState<AppState>>,

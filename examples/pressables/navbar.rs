@@ -10,7 +10,7 @@ pub(super) fn plugin(app: &mut App) {
         Update,
         (
             on_pressable_pressed.run_if(on_event::<OnPressed>),
-            on_focusable_pressed.run_if(on_event::<PressEvent>),
+            on_focusable_pressed.run_if(on_event::<FocusablePressed>),
         )
             .after(UiNavSet),
     );
@@ -37,7 +37,7 @@ fn on_pressable_pressed(
 /// Handle focusable press events on focusable navs.
 fn on_focusable_pressed(
     mut commands: Commands,
-    mut events: EventReader<PressEvent>,
+    mut events: EventReader<FocusablePressed>,
     mut query: Query<(&Pressables, &mut FocusableNav)>,
     mut pressable_query: Query<&mut PressablePressed, With<Pressable>>,
     mut press_writer: EventWriter<OnPressed>,

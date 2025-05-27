@@ -18,7 +18,8 @@ pub(super) fn plugin(app: &mut App) {
             focusable_system,
             update_focusable_animations,
             on_show_focusables_changed.run_if(resource_exists_and_changed::<ShowFocusables>),
-            show_focus_state.run_if(on_event::<UiNavFocusChangedEvent>),
+            show_focus_state
+                .run_if(on_event::<UiNavFocusChangedEvent>.or(on_event::<FocusablePressed>)),
             hide_focus_state.run_if(on_event::<CursorMoved>.or(on_event::<MouseButtonInput>)),
         )
             .after(UiNavSet),
@@ -95,7 +96,10 @@ fn update_focusable_animations(
 }
 
 /// System that starts the focusable outline animation when a focusable is pressed
-fn handle_focusable_click_events(mut commands: Commands, mut events: EventReader<PressEvent>) {
+fn handle_focusable_click_events(
+    mut commands: Commands,
+    mut events: EventReader<FocusablePressed>,
+) {
     for event in events.read() {
         commands
             .entity(event.entity)
@@ -138,13 +142,17 @@ fn on_show_focusables_changed(
 
 /// System that shows focusable outlines when focus change events are emitted.
 fn show_focus_state(
-    mut events: EventReader<UiNavFocusChangedEvent>,
+    mut focus_events: EventReader<UiNavFocusChangedEvent>,
+    mut press_events: EventReader<FocusablePressed>,
     mut show_focusables: ResMut<ShowFocusables>,
 ) {
-    for event in events.read() {
-        if event.interaction_type == UiNavInteractionType::Button {
-            show_focusables.0 = true;
-        }
+    let is_changed = !press_events.is_empty()
+        || focus_events
+            .read()
+            .any(|e| e.interaction_type == UiNavInteractionType::Button);
+    press_events.clear();
+    if is_changed {
+        show_focusables.0 = true;
     }
 }
 

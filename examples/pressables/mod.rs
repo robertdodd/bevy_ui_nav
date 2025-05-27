@@ -96,7 +96,7 @@ fn handle_interactions(
 /// System that handles press events for focusables and transfers their action to an appropriate child pressable.
 fn handle_focusable_click_events(
     mut commands: Commands,
-    mut events: EventReader<PressEvent>,
+    mut events: EventReader<FocusablePressed>,
     query: Query<(&Focusable, Option<&Pressables>, Has<Pressable>)>,
     mut pressable_query: Query<(&Pressable, &mut PressablePressed)>,
     mut press_writer: EventWriter<OnPressed>,

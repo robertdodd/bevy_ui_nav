@@ -9,7 +9,7 @@ pub struct BevyUiNavPlugin;
 
 impl Plugin for BevyUiNavPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<PressEvent>()
+        app.add_event::<FocusablePressed>()
             .add_event::<UiNavCancelEvent>()
             .add_event::<NavRequest>()
             .add_event::<UiNavFocusChangedEvent>()
@@ -147,7 +147,7 @@ fn handle_menu_removed(
 fn handle_nav_requests(
     mut events: EventReader<NavRequest>,
     mut queries: Queries,
-    mut press_writer: EventWriter<PressEvent>,
+    mut press_writer: EventWriter<FocusablePressed>,
     mut focus_writer: EventWriter<UiNavFocusChangedEvent>,
     mut cancel_writer: EventWriter<UiNavCancelEvent>,
 ) {
@@ -180,7 +180,7 @@ fn handle_nav_requests(
                 };
                 if let (Some(focused), Some(action)) = (focused, action) {
                     if queries.get_focusable_captures_movement(focused, *direction) {
-                        press_writer.write(PressEvent {
+                        press_writer.write(FocusablePressed {
                             entity: focused,
                             action,
                         });
@@ -217,7 +217,7 @@ fn handle_nav_requests(
                     continue;
                 }
                 if let Some(focused) = focused {
-                    press_writer.write(PressEvent {
+                    press_writer.write(FocusablePressed {
                         entity: focused,
                         action: PressableAction::Press,
                     });

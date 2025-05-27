@@ -26,7 +26,7 @@ fn main() {
         (
             handle_click_events
                 .after(UiNavSet)
-                .run_if(on_event::<PressEvent>),
+                .run_if(on_event::<FocusablePressed>),
             focusable_colors,
             handle_interactions,
         ),
@@ -152,7 +152,7 @@ fn spawn_modal(mut commands: Commands) {
 }
 
 fn handle_click_events(
-    mut events: EventReader<PressEvent>,
+    mut events: EventReader<FocusablePressed>,
     query: Query<&ButtonAction, With<Focusable>>,
     mut app_exit_writer: EventWriter<AppExit>,
     mut next_state: ResMut<NextState<ScreenState>>,

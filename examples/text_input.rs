@@ -20,7 +20,7 @@ fn main() {
                 text_control_style,
                 debug_cancel_events.run_if(on_event::<UiNavCancelEvent>),
                 (handle_button_click_events, handle_text_control_click_events)
-                    .run_if(on_event::<PressEvent>),
+                    .run_if(on_event::<FocusablePressed>),
                 update_text_on_change,
                 update_title_label.run_if(resource_changed::<GameData>),
                 focusable_colors,
@@ -195,7 +195,7 @@ fn text_control_style(
 }
 
 fn handle_button_click_events(
-    mut events: EventReader<PressEvent>,
+    mut events: EventReader<FocusablePressed>,
     query: Query<&ButtonAction, (With<Focusable>, With<Button>)>,
     mut app_exit_writer: EventWriter<AppExit>,
     mut game_data: ResMut<GameData>,
@@ -221,7 +221,7 @@ fn handle_button_click_events(
 
 /// System that handles click events on a text control
 fn handle_text_control_click_events(
-    mut events: EventReader<PressEvent>,
+    mut events: EventReader<FocusablePressed>,
     mut query: Query<&mut TextControlStatus>,
     mut nav_request_writer: EventWriter<NavRequest>,
 ) {

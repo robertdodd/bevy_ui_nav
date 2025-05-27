@@ -25,7 +25,7 @@ pub struct UiNavCancelEvent(pub Entity);
 /// This event is sent by this plugin and should be handled by the user.
 #[derive(Event, Debug, PartialEq, Reflect, Hash)]
 #[reflect(Debug, PartialEq, Hash)]
-pub struct PressEvent {
+pub struct FocusablePressed {
     pub entity: Entity,
     pub action: PressableAction,
 }

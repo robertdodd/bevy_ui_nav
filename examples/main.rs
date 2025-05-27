@@ -12,7 +12,7 @@ fn main() {
         .add_systems(
             Update,
             (
-                handle_click_events.run_if(on_event::<PressEvent>),
+                handle_click_events.run_if(on_event::<FocusablePressed>),
                 handle_cancel_events.run_if(on_event::<UiNavCancelEvent>),
                 focusable_colors,
             )
@@ -112,7 +112,7 @@ fn startup(mut commands: Commands) {
 }
 
 fn handle_click_events(
-    mut events: EventReader<PressEvent>,
+    mut events: EventReader<FocusablePressed>,
     query: Query<&ButtonAction, With<Focusable>>,
     mut app_exit_writer: EventWriter<AppExit>,
 ) {
