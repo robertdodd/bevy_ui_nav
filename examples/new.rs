@@ -32,6 +32,12 @@ const BUTTON_SHADOW_BLUR: f32 = 1.;
 
 const BUTTON_BORDER_RADIUS: f32 = 8.;
 
+const BUTTON_PADDING_H: f32 = 4.;
+const BUTTON_PADDING_V: f32 = 8.;
+
+const BUTTON_PADDING_H_SM: f32 = 4.;
+const BUTTON_PADDING_V_SM: f32 = 4.;
+
 const BUTTON_BG_NORMAL: Srgba = tailwind::RED_500;
 const BUTTON_BG_HOVERED: Srgba = tailwind::RED_700;
 const BUTTON_BG_PRESSED: Srgba = tailwind::RED_900;
@@ -58,6 +64,7 @@ enum MenuButton {
     Graphics,
     Sound,
     Controls,
+    Exit,
 }
 
 #[derive(Component, PartialEq, Eq, Clone, Copy, Debug)]
@@ -148,7 +155,7 @@ fn toggle_label(text: &str) -> impl Bundle + use<> {
     (
         Name::new("Toggle - Label"),
         Node {
-            padding: UiRect::all(Px(10.)),
+            padding: UiRect::axes(Px(BUTTON_PADDING_H_SM), Px(BUTTON_PADDING_V_SM)),
             min_width: Px(100.),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
@@ -174,8 +181,8 @@ fn toggle_button(text: &str, pressable: Pressable) -> impl Bundle + use<> {
         Button,
         pressable,
         Node {
-            padding: UiRect::all(Px(10.)),
-            min_width: Px(60.),
+            padding: UiRect::axes(Px(BUTTON_PADDING_H_SM), Px(BUTTON_PADDING_V_SM)),
+            min_width: Px(40.),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
             margin: UiRect::px(0., 0., 0., BUTTON_SHADOW_OFFSET),
@@ -200,8 +207,8 @@ fn button(text: &str) -> impl Bundle + use<> {
         Button,
         Pressable::new_press(),
         Node {
-            padding: UiRect::all(Px(20.)),
-            min_width: Px(200.),
+            padding: UiRect::axes(Px(BUTTON_PADDING_H), Px(BUTTON_PADDING_V)),
+            min_width: Px(120.),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
             margin: UiRect::px(0., 0., 0., BUTTON_SHADOW_OFFSET),
@@ -267,8 +274,15 @@ fn startup(mut commands: Commands) {
                     children![
                         (button("Save"), Focusable::default(), MenuButton::Graphics),
                         (button("Cancel"), Focusable::default(), MenuButton::Graphics),
-                    ]
-                )
+                    ],
+                ),
+                (
+                    Node {
+                        justify_content: JustifyContent::Center,
+                        ..default()
+                    },
+                    children![(button("Quit"), Focusable::default(), MenuButton::Exit)],
+                ),
             ]
         )],
     ));
@@ -278,7 +292,7 @@ fn handle_click_events(
     mut events: EventReader<OnPressed>,
     query: Query<&MenuButton>,
     mut next_screen: ResMut<NextState<Screen>>,
-    // mut app_exit_writer: EventWriter<AppExit>,
+    mut app_exit_writer: EventWriter<AppExit>,
 ) {
     for event in events.read() {
         if let Ok(button) = query.get(event.0) {
@@ -292,9 +306,10 @@ fn handle_click_events(
                 }
                 MenuButton::Controls => {
                     next_screen.set(Screen::Controls);
-                } // MenuButton::Exit => {
-                  //     app_exit_writer.write(AppExit::Success);
-                  // }
+                }
+                MenuButton::Exit => {
+                    app_exit_writer.write(AppExit::Success);
+                }
             };
         }
     }
