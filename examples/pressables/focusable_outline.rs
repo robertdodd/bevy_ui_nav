@@ -1,6 +1,9 @@
 use std::time::Duration;
 
-use bevy::prelude::{Val::*, *};
+use bevy::{
+    input::mouse::MouseButtonInput,
+    prelude::{Val::*, *},
+};
 use bevy_ui_nav::prelude::*;
 
 use super::Pressable;
@@ -16,7 +19,7 @@ pub(super) fn plugin(app: &mut App) {
             update_focusable_animations,
             on_show_focusables_changed.run_if(resource_exists_and_changed::<ShowFocusables>),
             show_focus_state.run_if(on_event::<UiNavFocusChangedEvent>),
-            hide_focus_state.run_if(on_event::<CursorMoved>),
+            hide_focus_state.run_if(on_event::<CursorMoved>.or(on_event::<MouseButtonInput>)),
         )
             .after(UiNavSet),
     );
@@ -145,13 +148,16 @@ fn show_focus_state(
     }
 }
 
-/// System that hides focusable outlines when any mouse events effect a pressable.
+/// System that hides focusable outlines when any mouse events effect an `Interaction` component on a `Pressable`
+/// entity.
 fn hide_focus_state(
-    mut events: EventReader<CursorMoved>,
+    mut cursor_events: EventReader<CursorMoved>,
+    mut button_events: EventReader<MouseButtonInput>,
     query: Query<(), (Changed<Interaction>, With<Pressable>)>,
     mut show_focusables: ResMut<ShowFocusables>,
 ) {
-    events.clear();
+    cursor_events.clear();
+    button_events.clear();
     if !query.is_empty() {
         show_focusables.0 = false;
     }
