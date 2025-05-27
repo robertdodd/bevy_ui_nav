@@ -18,6 +18,7 @@ fn main() {
         .add_systems(
             Update,
             (
+                setup_new_focusables,
                 handle_click_events.run_if(on_event::<OnPressed>),
                 on_toggle_click.run_if(on_event::<OnPressed>),
                 update_screen_labels.run_if(state_changed::<Screen>),
@@ -108,7 +109,7 @@ fn panel() -> impl Bundle + use<> {
         Name::new("Panel"),
         Node {
             flex_direction: FlexDirection::Column,
-            row_gap: Px(10.),
+            row_gap: Px(20.),
             padding: UiRect::all(Px(20.)),
             ..default()
         },
@@ -124,6 +125,7 @@ fn panel_body() -> impl Bundle + use<> {
             flex_direction: FlexDirection::Column,
             row_gap: Px(10.),
             padding: UiRect::all(Px(20.)),
+            align_items: AlignItems::Center,
             ..default()
         },
         BackgroundColor(tailwind::SLATE_700.into()),
@@ -149,10 +151,7 @@ fn panel_header() -> impl Bundle + use<> {
 fn button_focusable() -> impl Bundle + use<> {
     (
         Name::new("Button - Focusable"),
-        Node {
-            // padding: UiRect::all(Px(4.)),
-            ..default()
-        },
+        Node::default(),
         Focusable::default(),
         BorderRadius::all(Px(8.)),
     )
@@ -164,7 +163,6 @@ fn toggle_control() -> impl Bundle + use<> {
         Node {
             flex_direction: FlexDirection::Row,
             column_gap: Px(10.),
-            width: Percent(100.),
             padding: UiRect::all(Px(4.)),
             justify_content: JustifyContent::SpaceBetween,
             align_items: AlignItems::Center,
@@ -180,7 +178,7 @@ fn toggle_label(text: &str) -> impl Bundle + use<> {
         Name::new("Toggle - Label"),
         Node {
             padding: UiRect::all(Px(10.)),
-            width: Percent(100.),
+            min_width: Px(100.),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
             margin: UiRect::px(0., 0., 0., BUTTON_SHADOW_OFFSET),
@@ -286,21 +284,18 @@ fn startup(mut commands: Commands) {
                                 )
                             ]
                         ),
-                        (
-                            Node::default(),
-                            children![(button("Test"), Focusable::default(), MenuButton::Graphics)]
-                        ),
-                        (
-                            Node::default(),
-                            children![(
-                                button_focusable(),
-                                children![(button("Test Old"), MenuButton::Graphics)]
-                            )]
-                        ),
-                        (
-                            Node::default(),
-                            children![(button("Exit"), Focusable::default(), MenuButton::Exit)]
-                        ),
+                    ]
+                ),
+                (
+                    Node {
+                        flex_direction: FlexDirection::Row,
+                        column_gap: Px(10.),
+                        justify_content: JustifyContent::Center,
+                        ..default()
+                    },
+                    children![
+                        (button("Save"), Focusable::default(), MenuButton::Graphics),
+                        (button("Cancel"), Focusable::default(), MenuButton::Graphics),
                     ]
                 )
             ]
@@ -452,22 +447,23 @@ fn pressable_system(
 
 fn focusable_system(
     mut commands: Commands,
-    query: Query<(Entity, &Focusable, Has<Outline>, Has<FocusableAnimation>), Changed<Focusable>>,
+    mut query: Query<
+        (Entity, &Focusable, &mut Outline, Has<FocusableAnimation>),
+        Changed<Focusable>,
+    >,
 ) {
-    for (entity, focusable, has_outline, has_animation) in query.iter() {
+    for (entity, focusable, mut outline, has_animation) in query.iter_mut() {
         let is_focused = matches!(focusable.state(), FocusState::Focused);
         // insert an outline animation if focused and we dont have one, or whenever pressed
         if is_focused {
-            if !has_outline || focusable.state() == FocusState::Focused {
-                commands.entity(entity).insert((
-                    Outline::new(Px(FOCUSABLE_OUTLINE_START), Val::ZERO, Color::WHITE),
-                    FocusableAnimation::default(),
-                ));
+            if focusable.state() == FocusState::Focused {
+                outline.color = Color::WHITE;
+                commands
+                    .entity(entity)
+                    .insert(FocusableAnimation::default());
             }
         } else {
-            if has_outline {
-                commands.entity(entity).remove::<Outline>();
-            }
+            outline.color = Color::NONE;
             if has_animation {
                 commands.entity(entity).remove::<FocusableAnimation>();
             }
@@ -498,9 +494,25 @@ fn update_focusable_animations(
 
 fn handle_focusable_click_events(mut commands: Commands, mut events: EventReader<PressEvent>) {
     for event in events.read() {
-        commands.entity(event.entity).insert((
-            Outline::new(Px(FOCUSABLE_OUTLINE_START), Val::ZERO, Color::WHITE),
-            FocusableAnimation::default(),
+        commands
+            .entity(event.entity)
+            .insert(FocusableAnimation::default());
+    }
+}
+
+fn setup_new_focusables(
+    mut commands: Commands,
+    query: Query<(Entity, &Focusable), (Added<Focusable>, Without<Outline>)>,
+) {
+    for (entity, focusable) in query.iter() {
+        commands.entity(entity).insert(Outline::new(
+            Px(FOCUSABLE_OUTLINE_END),
+            Val::ZERO,
+            if focusable.state() == FocusState::Focused {
+                Color::WHITE
+            } else {
+                Color::NONE
+            },
         ));
     }
 }
