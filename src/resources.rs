@@ -8,11 +8,17 @@ pub struct UiNavSet;
 
 /// Resource holding the global menu navigation state.
 #[derive(Resource, Default, Debug)]
-pub(crate) struct UiNavState {
+pub struct UiNavState {
     /// Whether navigation state is locked
-    pub locked: bool,
+    pub(crate) locked: bool,
     /// The current active `Menu`
-    pub menu: Option<Entity>,
+    pub(crate) menu: Option<Entity>,
+}
+
+impl UiNavState {
+    pub fn locked(&self) -> bool {
+        self.locked
+    }
 }
 
 /// Resource containing settings for how the UI Navigation plugin behaves.

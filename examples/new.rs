@@ -41,9 +41,6 @@ const BUTTON_PADDING_V_SM: f32 = 4.;
 const BUTTON_BG_NORMAL: Srgba = tailwind::RED_500;
 const BUTTON_BG_HOVERED: Srgba = tailwind::RED_700;
 const BUTTON_BG_PRESSED: Srgba = tailwind::RED_900;
-// const BUTTON_BORDER_COLOR_NORMAL: Srgba = tailwind::RED_950;
-// const BUTTON_BORDER_COLOR_HOVERED: Srgba = tailwind::RED_950;
-// const BUTTON_BORDER_COLOR_PRESSED: Srgba = Srgba::NONE;
 
 #[derive(Component)]
 pub struct ScreenLabel;
