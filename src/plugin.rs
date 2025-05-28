@@ -157,7 +157,7 @@ fn handle_nav_requests(
     for event in events.read() {
         match event {
             NavRequest::SetFocus(entity) => {
-                if queries.nav_state.locked {
+                if queries.lock_state.0 {
                     continue;
                 }
                 if let Some(new_focused) = queries.set_focus(focused, *entity) {
@@ -169,7 +169,7 @@ fn handle_nav_requests(
                 }
             }
             NavRequest::Movement(direction) => {
-                if queries.nav_state.locked {
+                if queries.lock_state.0 {
                     continue;
                 }
                 // try capture movement against the current focusable
@@ -217,7 +217,7 @@ fn handle_nav_requests(
                 }
             }
             NavRequest::ActionPress => {
-                if queries.nav_state.locked {
+                if queries.lock_state.0 {
                     continue;
                 }
                 if let Some(focused) = focused {
@@ -228,7 +228,7 @@ fn handle_nav_requests(
                 }
             }
             NavRequest::Cancel => {
-                if queries.nav_state.locked {
+                if queries.lock_state.0 {
                     continue;
                 }
                 if let Some(menu) = queries.nav_state.menu {
@@ -238,10 +238,10 @@ fn handle_nav_requests(
                 }
             }
             NavRequest::Lock => {
-                queries.nav_state.locked = true;
+                queries.lock_state.0 = true;
             }
             NavRequest::Unlock => {
-                queries.nav_state.locked = false;
+                queries.lock_state.0 = false;
             }
             NavRequest::Refresh => (),
         }

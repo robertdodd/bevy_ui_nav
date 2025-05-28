@@ -1,11 +1,6 @@
 use bevy::{ecs::system::SystemParam, prelude::*};
 
-use crate::{
-    prelude::{
-        Focusable, FocusableOf, Focusables, LastFocusable, NavMenu, PressableAction, UiNavState,
-    },
-    types::UiNavDirection,
-};
+use crate::{prelude::*, types::UiNavDirection};
 
 /// Input state for actions.
 ///
@@ -34,6 +29,7 @@ pub(crate) struct Queries<'w, 's> {
         ),
     >,
     pub nav_state: ResMut<'w, UiNavState>,
+    pub lock_state: ResMut<'w, LockState>,
 }
 
 impl Queries<'_, '_> {
