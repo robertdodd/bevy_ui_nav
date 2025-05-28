@@ -14,6 +14,7 @@ impl Plugin for BevyUiNavPlugin {
             .add_event::<NavRequest>()
             .add_event::<UiNavFocusChangedEvent>()
             .init_resource::<UiNavState>()
+            .init_resource::<LockState>()
             .init_resource::<UiNavSettings>()
             .init_resource::<InputManager>()
             .add_systems(PreUpdate, (setup_new_menus, setup_new_focusables))
