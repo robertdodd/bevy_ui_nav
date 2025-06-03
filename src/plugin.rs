@@ -146,6 +146,7 @@ fn handle_menu_removed(
 /// System that handles internal `NavRequest` events.
 #[allow(clippy::too_many_arguments)]
 fn handle_nav_requests(
+    mut commands: Commands,
     mut events: EventReader<NavRequest>,
     mut queries: Queries,
     mut press_writer: EventWriter<FocusablePressed>,
@@ -234,6 +235,7 @@ fn handle_nav_requests(
                 }
                 if let Some(menu) = queries.nav_state.menu {
                     cancel_writer.write(UiNavCancelEvent(menu));
+                    commands.trigger_targets(OnMenuCancel, [menu]);
                 } else {
                     warn!("NavRequest::Cancel received but no current menu");
                 }

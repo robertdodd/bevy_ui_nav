@@ -12,6 +12,11 @@ pub struct UiNavFocusChangedEvent {
     pub interaction_type: UiNavInteractionType,
 }
 
+/// Event fired on an entity with a `NavMenu` component when the "Cancel" key is pressed.
+#[derive(Event, Debug, Reflect, PartialEq, Hash)]
+#[reflect(Debug, PartialEq, Hash)]
+pub struct OnMenuCancel;
+
 /// Event emitted when the "Cancel" key is pressed. The entity is the menu.
 ///
 /// This event is emitted by this plugin and should be handled by the user if they wish to handle cancel events in a
